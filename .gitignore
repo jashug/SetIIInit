@@ -1,0 +1,19 @@
+# Emacs backup files
+*~
+
+# TeX auxiliaries
+*.aux
+*.toc
+*.bbl
+*.brf
+*.bcf
+*.blg
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+_region_.tex
+auto/
+*.nav
+*.snm
+*.lox

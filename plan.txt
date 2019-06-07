@@ -1,0 +1,13 @@
+(J)  1.   Define II specs at set level
+
+(JM) 2.   Define Forsberg's construction (up to equivalence)
+
+(J)  2.5. Define type-checking algorithm, show equivalence with indexed inductive judgments
+
+(JM) 3.   Prove recursive-recursive ("general") eliminator into sets (type-theory way, beta-reduced)
+
+(M?) 4?.  Prove a non-dependent version closer to Streicher's proof
+
+(M)  5.   Give example (type theory) showing raw terms, judgements, and at least weak initiality
+
+     6?.  Elimination into non-sets
