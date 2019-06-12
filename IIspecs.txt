@@ -1,0 +1,61 @@
+Specifying inductive-inductive types requires knowing what the availiable sorts are in each context,
+which in turn requires knowing the terms of each sort to use as indices.
+
+Thus inductive-inductive specifications must be defined by induction-recursion simultaneously with
+the interpretation as inductive-inductive types.
+
+(However, this induction-recursion is simple enough that it can be carried out in Coq)
+
+Here I use Ty_i for a general type of level i, and Prop_i and Set_i for types of specific hLevel
+in the as subuniverses of Ty_i. I write Ty for Ty_0 and similarly for Prop and Set.
+
+For the interpretation (semantics), we want:
+sem-Ctx     : Ty_1
+sem-Ty-sort : sem-Ctx -> Ty_1
+sem-Ty-op   : sem-Ctx -> Ty_1
+sem-Data    : sem-Ctx -> Ty_1
+
+sem-Sorts : sem-Ctx -> Set
+
+with operations
+sem-emp : sem-Ctx
+sem-ext-sort : (G : sem-Ctx) -> sem-Ty-sort G -> sem-Ctx
+sem-ext-op   : (G : sem-Ctx) -> sem-Ty-op   G -> sem-Ctx
+sem-ext-data : (G : sem-Ctx) -> sem-Data    G -> sem-Ctx
+  (possibly implemented in terms of sem-Data G -> sem-Ty-op G)
+
+sem-U : sem-Ty-sort G
+sem-sort-Pi : (A : sem-Data G) -> sem-Ty-sort (sem-ext-data G A) -> sem-Ty-sort G
+sem-sort-PiX : (X : Set) -> (X -> sem-Ty-sort G) -> sem-Ty-sort G
+  (may be able to take X : Groupoid)
+
+sem-El : sem-Sorts G -> sem-Ty-op G
+sem-op-Pi : (A : sem-Data G) -> sem-Ty-op (sem-ext-data G A) -> sem-Ty-op G
+sem-op-PiX : (X : Set) -> (X -> sem-Ty-op G) -> sem-Ty-op G
+
+sem-data-inc : sem-Sorts G -> sem-Data G
+sem-data-PiX : (X : Set) -> (X -> sem-Data G) -> sem-Data G
+  (may be able to take X : Ty) (probably requires function extensionality)
+
+With the semantics given as such, we can pick out the representable specifications by
+an inductive-recursive definition, depending on the semantics through sem-Sorts.
+This allows us to define other information (type of morphisms, elimination into large sets, etc.)
+by recursion on the representable specifications.
+
+(This is slightly reminiscent of "Outrageous but Meaningful Coincidences")
+
+The idea is that sem-Ctx should contain all the pieces of Forsberg's construction which can be defined by a fold,
+and then sem-Sorts packages them up to obtain the actual inductive-inductive type, and returns the set of sorts.
+
+Questions:
+* I'm not sure I have the universe levels and truncation levels right everywhere. Should be easy to figure out
+  along the way.
+* There are several interesting subsets of inductive-inductive specifications
+  (those without infinitary arguments and thus not requiring function extensionality,
+   those where equality of the data is decidable and we can thus write a type-checker returning yes or no
+   for the raw syntax, probably others as well).
+  What is the best way to define these subsets (via a predicate or a family)?
+* Which language to work in, with which options and which standard library?
+  For this first step, everything works just as well in Coq as in Agda; do we want to work with the HoTT library,
+  or the Coq standard library, or a minimal prelude of our own?
+
