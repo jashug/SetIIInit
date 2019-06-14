@@ -1,0 +1,15 @@
+Assume we have defined indexed inductive specifications in a way that matches II types, so allowing
+mixing sorts and operations, so that everything is a simple fold.
+
+semantic contexts consist of:
+an inductive specification of the pre-syntax
+for each pre-algebra,
+  an inductive specification of the goodness predicates
+  for each goodness algebra (non-inductive-inductive)
+    a set of sorts
+    for each sort
+      a sort in the pre-syntax specification
+      for each value in the corresponding pre-sort
+        a sort in the goodness specification
+
+semantic sort types, operation types, and data should follow similarly
