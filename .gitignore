@@ -1,3 +1,8 @@
+# Coq auxiliaries
+*.vo
+*.glob
+.coqdeps.d
+
 # Emacs backup files
 *~
 
