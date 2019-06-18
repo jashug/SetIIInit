@@ -1,0 +1,53 @@
+\documentclass{amsart}
+\usepackage{mathpartir}
+\def\ctx{\,\mathsf{ctx}}
+\def\sort{\,\mathsf{sort}}
+\def\op{\,\mathsf{op}}
+\def\data{\,\mathsf{data}}
+\def\sorts{\,\mathsf{sorts}}
+\def\el#1{\underline{#1}}
+\let\types\vdash
+\let\GG\Gamma
+\begin{document}
+
+Judgments
+\begin{mathpar}
+  \GG \ctx
+  \and
+  \GG\types s\sort
+  \and
+  \GG\types a\op
+  \and
+  \GG\types A\data
+  \and
+  \GG\types S\sorts
+\end{mathpar}
+
+Operations:
+\begin{mathpar}
+  \infer{ }{\cdot\ctx}
+  \and
+  \infer{\GG\ctx \\ \GG\types s\sort}{\GG,x:s \ctx}
+  \and
+  \infer{\GG\ctx \\ \GG\types a\op}{\GG,x:a \ctx}
+  \and
+  \infer{\GG\ctx \\ \GG\types A\data}{\GG,x:A \ctx}
+  \and
+  \infer{ }{\GG\types U\sort}
+  \and
+  \infer{\GG\types A \data \\ \GG,x:A \types s\sort}{\GG\types (x:A) \to s \sort}
+  \and
+  \infer{(\GG\types s_x\sort)_{x:X}}{\GG \types (x:X) \to s_x \sort}
+  \and
+  \infer{\GG\types S\sorts}{\GG\types \el{S} \op}
+  \and
+  \infer{\GG\types A\data \\ \GG,x:A \types b\op}{\GG \types (x:A)\to b \op}
+  \and
+  \infer{(\GG \types b_x\op)_{x:X}}{\GG \types (x:A)\to b_x \op}
+  \and
+  \infer{\GG\types S\sorts}{\GG\types S\data}
+  \and
+  \infer{(\GG\types A_x)_{x:X}}{\GG\types (x:X)\to A_x \data}
+\end{mathpar}
+
+\end{document}
