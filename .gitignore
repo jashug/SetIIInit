@@ -2,6 +2,7 @@
 *.vo
 *.glob
 .coqdeps.d
+Makefile.conf
 
 # Emacs backup files
 *~
