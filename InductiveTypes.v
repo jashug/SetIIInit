@@ -32,32 +32,33 @@ Fixpoint Operations@{} (A : OpSpec@{i} I) : Type@{i}
      end.
 
 Universe j.
+Constraint i <= j. (* Don't consider eliminating into smaller universes *)
 Context (P : ∀ i, X i → Type@{j}).
-Fixpoint InductiveHypothesis@{ij} (A : DataSpec@{i} I)
-  : ElDataSpec A → Type@{ij}
+Fixpoint InductiveHypothesis@{} (A : DataSpec@{i} I)
+  : ElDataSpec A → Type@{j}
   := match A return ElDataSpec A → Type@{_} with
      | inc i => P i
      | inf A B => λ f, ∀ a, InductiveHypothesis (B a) (f a)
      end.
-Fixpoint Methods@{ij} (A : OpSpec@{i} I)
-  : Operations A → Type@{ij}
+Fixpoint Methods@{} (A : OpSpec@{i} I)
+  : Operations A → Type@{j}
   := match A return Operations A → Type@{_} with
      | el i => P i
-     | ind_arg A B => λ f, ∀ x, InductiveHypothesis@{ij} A x → Methods B (f x)
+     | ind_arg A B => λ f, ∀ x, InductiveHypothesis A x → Methods B (f x)
      | nonind_arg A B => λ f, ∀ a, Methods (B a) (f a)
      | op_prod A B => λ x, Methods A (fst x) * Methods B (snd x)
      | op_skip => λ _, Unit
      end.
 
 Context (E : ∀ i x, P i x).
-Fixpoint InductiveData@{ij} (A : DataSpec@{i} I)
-  : ∀ x, InductiveHypothesis@{ij} A x
+Fixpoint InductiveData@{} (A : DataSpec@{i} I)
+  : ∀ x, InductiveHypothesis A x
   := match A return ∀ x, InductiveHypothesis A x with
      | inc i => E i
      | inf A B => λ f a, InductiveData (B a) (f a)
      end.
-Fixpoint Equations@{ij} (A : OpSpec@{i} I)
-  : ∀ op, Methods@{ij} A op → Type@{ij}
+Fixpoint Equations@{} (A : OpSpec@{i} I)
+  : ∀ op, Methods A op → Type@{j}
   := match A return ∀ op, Methods A op → Type@{_} with
      | el i => λ x y, E i x = y
      | ind_arg A B => λ f f',
@@ -86,17 +87,17 @@ Admitted.
 Definition operations : Operations@{i} sorts A.
 Admitted.
 
-Universe j ij.
-Constraint i <= ij, j <= ij.
+Universe j.
+Constraint i <= j.
 Context
   (P : ∀ i, sorts i → Type@{j})
-  (M : Methods@{i j ij} sorts P A operations)
+  (M : Methods@{i j} sorts P A operations)
 .
 
 Definition eliminators : ∀ i x, P i x.
 Admitted.
 
-Definition equations : Equations@{i j ij} sorts P eliminators A operations M.
+Definition equations : Equations@{i j} sorts P eliminators A operations M.
 Admitted.
 End initial.
 End Initial.
