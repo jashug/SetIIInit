@@ -135,7 +135,15 @@ data PreCtx (γ : sem.(Sem.Ctx)) : Type@{i+1} where
 Ctx := PreCtx sem.(Sem.emp)
 
 Both of these have the advantage that Ctx lands in Type@{i+1} not Type@{U > i}.
+
+However, the first keeps semantic contexts around,
+while the second has a bad induction principle.
+
+Probably best is to do everything as an ornament,
+exploiting the fact that we never branch on the semantics,
+and that the extra information is small.
 *)
+
 Inductive PreCtx : Type@{i} :=
   | pre_emp
   | pre_ext_sort (Γ : PreCtx)
