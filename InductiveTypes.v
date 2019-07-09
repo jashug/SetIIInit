@@ -14,6 +14,13 @@ Cumulative Inductive OpSpec@{i} (I : Type@{i}) : Type@{i+1} :=
   | op_prod (A B : OpSpec I)
   | op_skip
 .
+Arguments inc {I} i.
+Arguments inf {I} A B.
+Arguments el {I} i.
+Arguments ind_arg {I} A B.
+Arguments nonind_arg {I} A B.
+Arguments op_prod {I} A B.
+Arguments op_skip {I}.
 Section el_op.
 Universe i.
 Context {I : Type@{i}} (X : I → Type@{i}).
