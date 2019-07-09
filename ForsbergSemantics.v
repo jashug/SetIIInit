@@ -92,11 +92,11 @@ Arguments good_op {Γ} _ pre _ [Ix'] Ix_inj.
 (* For now, ignore infinitary arguments/indices *)
 Definition Data (Γ : Ctx) := Indices Γ.
 
-Definition data_to_op {Γ : Ctx} (A : Data Γ) : TyOp Γ
+(* Definition data_to_op {Γ : Ctx} (A : Data Γ) : TyOp Γ
   := {|
         pre_op _ Ix_inc := el (Ix_inc _);
         good_op := _;
-     |}.
+     |}. *)
 
 Definition ext_sort (Γ : Ctx) (A : TySort Γ) : Ctx
   := {|
