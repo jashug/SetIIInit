@@ -7,64 +7,42 @@ Require Import InductiveTypes.
 Record Ctx@{i} : Type@{i+1} := {
   indices0 : Type@{i};
   indices1 : (indices0 → Type@{i}) → indices0 → Type@{i};
-  (* indices_pr_10 : ∀ {Sorts0}, indices1 Sorts0 → indices0; *)
-  operations0 : ∀ {indices0' : Type@{i}} (indices0_inc : indices0 → indices0'),
-                OpSpec@{i} indices0;
-  operations1 : ∀ {indices0' indices1' : Type@{i}} {Sorts0'},
-    ∀ (indices0_inc : indices0 → indices0') (Sorts0 := Sorts0' o indices0_inc),
-    Operations@{i} Sorts0' (operations0 indices0_inc) →
-    (∀ (i0 : indices0) (i1 : indices1 Sorts0 i0), Sorts0 i0 → indices1') →
-    OpSpec@{i} indices1';
-  indices2 : ∀ {indices0' : Type@{i}} (indices0_inc : indices0 → indices0'),
-    ∀ (Sorts0' : indices0' → Type@{i})
-      (Sorts0 := Sorts0' o indices0_inc),
-    Operations@{i} Sorts0' (operations0 indices0_inc) →
-    (∀ (i0 : indices0) (i1 : indices1 Sorts0 i0), Sorts0 i0 → Type@{i}) →
-    ∀ (i0 : indices0), indices1 Sorts0 i0 → Type@{i};
-(*   indices_pr_21 : ∀ {indices0' indices0_inc Sorts0' Ops0 Sorts1},
-                  @indices2 indices0' indices0_inc Sorts0' Ops0 Sorts1 →
-                  indices1 (Sorts0' o indices0_inc); *)
-(*   indices_pr_20 : ∀ {indices0' indices0_inc Sorts0' Ops0 Sorts1},
-                  @indices2 indices0' indices0_inc Sorts0' Ops0 Sorts1 →
-                  indices0
-    := λ indices0' indices0_inc Sorts0' Ops0 Sorts1,
-       indices_pr_10 o
-       @indices_pr_21 indices0' indices0_inc Sorts0' Ops0 Sorts1; *)
+  operations0 : OpSpec@{i} indices0;
+  operations1 : ∀ {Sorts0}, Operations@{i} Sorts0 operations0 →
+                OpSpec@{i} {i0 : indices0 & indices1 Sorts0 i0 * Sorts0 i0};
+  indices2 :
+    ∀ {Sorts0},
+    (∀ i0, indices1 Sorts0 i0 → Sorts0 i0 → Type@{i}) →
+    Operations@{i} Sorts0 operations0 →
+    ∀ i0, indices1 Sorts0 i0 → Type@{i};
   Indices : Type@{i} :=
-    let pre_sorts := Initial.sorts (operations0 idmap) in
-    let pre_ops := Initial.operations (operations0 idmap) in
-    let good_sorts i0 i1 p := Initial.sorts
-      (operations1 idmap pre_ops (λ i0 i1 p, (i0; (i1, p))))
-      (i0; (i1, p)) in
+    let pre_sorts := Initial.sorts operations0 in
+    let pre_ops := Initial.operations operations0 in
+    let good_sorts i0 i1 p
+     := Initial.sorts (operations1 pre_ops) (i0; (i1, p)) in
     {i0 : indices0 &
     {i1 : indices1 pre_sorts i0 &
-          indices2 idmap pre_sorts pre_ops good_sorts i0 i1
+          indices2 good_sorts pre_ops i0 i1
     }};
 }.
 
 Record TyOp@{i} (Γ : Ctx@{i}) : Type@{i+1} := {
-  ops0 : ∀ {indices0' : Type@{i}} (indices0_inc : Γ.(indices0) → indices0'),
-         OpSpec@{i} indices0';
-  ops1 : ∀ {indices0' indices1' : Type@{i}} {Sorts0'},
-    ∀ (indices0_inc : Γ.(indices0) → indices0')
-      (Sorts0 := Sorts0' o indices0_inc)
-      (indices1_inc : ∀ (i0 : Γ.(indices0)),
-       Γ.(indices1) Sorts0 i0 → Sorts0 i0 → indices1'),
-    Operations@{i} Sorts0' (ops0 indices0_inc) →
-    Operations@{i} Sorts0' (Γ.(operations0) indices0_inc) →
-    OpSpec@{i} indices1';
+  ops0 : OpSpec@{i} Γ.(indices0);
+  ops1 : ∀ {Sorts0},
+    Operations@{i} Sorts0 ops0 →
+    Operations@{i} Sorts0 Γ.(operations0) →
+    OpSpec@{i} {i0 : Γ.(indices0) & Γ.(indices1) Sorts0 i0 * Sorts0 i0};
 }.
-Arguments ops0 {Γ} _ {indices0'} indices0_inc.
-Arguments ops1 {Γ} _ {indices0' indices1' Sorts0'}
-               indices0_inc indices1_inc ops0 Γ_ops0.
+Arguments ops0 {Γ} _.
+Arguments ops1 {Γ} _ {Sorts0} ops0 Γ_ops0.
 
 (* For now, ignore infinitary arguments/indices *)
 Definition Data (Γ : Ctx) := Indices Γ.
 
 Definition data_to_op {Γ : Ctx} (A : Data Γ) : TyOp Γ
   := {|
-        ops0 _ ix0_inc := el (ix0_inc A.1);
-        ops1 _ _ Sorts0' ix0_inc ix1_inc pt Γops := el (ix1_inc A.1 (* A.2.1 *)_ pt);
+        ops0 := el A.1;
+        ops1 Sorts0 pt Γops := el (A.1; (A.2.1 : indices1 Γ Sorts0 A.1, pt));
      |}.
 
 
