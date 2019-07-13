@@ -6,7 +6,10 @@ Require Import InductiveTypes.
 
 Record Ctx@{i} : Type@{i+1} := {
   indices0 : Type@{i};
-  indices1 : (indices0 → Type@{i}) → indices0 → Type@{i};
+  indices1 : (indices0 → Type@{i}) → (indices0 → Type@{i});
+  functor_indices1 : ∀ {Sorts0a Sorts0b : indices0 → Type@{i}},
+    (∀ i0, Sorts0a i0 → Sorts0b i0) →
+    (∀ {i0}, indices1 Sorts0a i0 → indices1 Sorts0b i0);
   operations0 : OpSpec@{i} indices0;
   operations1 : ∀ {Sorts0}, Operations@{i} Sorts0 operations0 →
                 OpSpec@{i} {i0 : indices0 & indices1 Sorts0 i0 * Sorts0 i0};
@@ -42,9 +45,13 @@ Definition Data (Γ : Ctx) := Indices Γ.
 Definition data_to_op {Γ : Ctx} (A : Data Γ) : TyOp Γ
   := {|
         ops0 := el A.1;
-        ops1 Sorts0 pt Γops := el (A.1; (A.2.1 : indices1 Γ Sorts0 A.1, pt));
+        ops1 Sorts0 pt Γops :=
+          let ix1 : indices1 Γ Sorts0 A.1
+           := Γ.(functor_indices1)
+              (Initial.initial_morphism_sorts Γ.(operations0) Γops)
+              A.2.1 in
+          el (A.1; (ix1, pt));
      |}.
-
 
 (* Record IndSpec@{i} : Type@{i+1} := {
   Ix : Type@{i};

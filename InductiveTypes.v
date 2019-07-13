@@ -94,6 +94,7 @@ Admitted.
 Definition operations : Operations@{i} sorts A.
 Admitted.
 
+Section dependent_eliminator.
 Universe j.
 Constraint i <= j.
 Context
@@ -106,6 +107,24 @@ Admitted.
 
 Definition equations : Equations@{i j} sorts P eliminators A operations M.
 Admitted.
+End dependent_eliminator.
+
+(* Can be derived from dependent_eliminator *)
+Section initiality.
+Universe j.
+Constraint i <= j.
+Context
+  {sorts' : I → Type@{j}}
+  (operations' : Operations@{j} sorts' A)
+.
+
+(* Should really define morphisms including equations,
+   then prove that this one is unique. *)
+
+Definition initial_morphism_sorts : ∀ i, sorts i → sorts' i.
+Admitted.
+
+End initiality.
 End initial.
 End Initial.
 
