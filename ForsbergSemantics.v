@@ -1,7 +1,74 @@
 Require Import HoTT.Basics Coq.Unicode.Utf8.
+Require Import HoTT.Types.Sum.
 Require Import InductiveTypes.
 
-Record IndSpec@{i} : Type@{i+1} := {
+(* Define semantics *)
+
+Record Ctx@{i} : Type@{i+1} := {
+  indices0 : Type@{i};
+  indices1 : (indices0 → Type@{i}) → indices0 → Type@{i};
+  (* indices_pr_10 : ∀ {Sorts0}, indices1 Sorts0 → indices0; *)
+  operations0 : ∀ {indices0' : Type@{i}} (indices0_inc : indices0 → indices0'),
+                OpSpec@{i} indices0;
+  operations1 : ∀ {indices0' indices1' : Type@{i}} {Sorts0'},
+    ∀ (indices0_inc : indices0 → indices0') (Sorts0 := Sorts0' o indices0_inc),
+    Operations@{i} Sorts0' (operations0 indices0_inc) →
+    (∀ (i0 : indices0) (i1 : indices1 Sorts0 i0), Sorts0 i0 → indices1') →
+    OpSpec@{i} indices1';
+  indices2 : ∀ {indices0' : Type@{i}} (indices0_inc : indices0 → indices0'),
+    ∀ (Sorts0' : indices0' → Type@{i})
+      (Sorts0 := Sorts0' o indices0_inc),
+    Operations@{i} Sorts0' (operations0 indices0_inc) →
+    (∀ (i0 : indices0) (i1 : indices1 Sorts0 i0), Sorts0 i0 → Type@{i}) →
+    ∀ (i0 : indices0), indices1 Sorts0 i0 → Type@{i};
+(*   indices_pr_21 : ∀ {indices0' indices0_inc Sorts0' Ops0 Sorts1},
+                  @indices2 indices0' indices0_inc Sorts0' Ops0 Sorts1 →
+                  indices1 (Sorts0' o indices0_inc); *)
+(*   indices_pr_20 : ∀ {indices0' indices0_inc Sorts0' Ops0 Sorts1},
+                  @indices2 indices0' indices0_inc Sorts0' Ops0 Sorts1 →
+                  indices0
+    := λ indices0' indices0_inc Sorts0' Ops0 Sorts1,
+       indices_pr_10 o
+       @indices_pr_21 indices0' indices0_inc Sorts0' Ops0 Sorts1; *)
+  Indices : Type@{i} :=
+    let pre_sorts := Initial.sorts (operations0 idmap) in
+    let pre_ops := Initial.operations (operations0 idmap) in
+    let good_sorts i0 i1 p := Initial.sorts
+      (operations1 idmap pre_ops (λ i0 i1 p, (i0; (i1, p))))
+      (i0; (i1, p)) in
+    {i0 : indices0 &
+    {i1 : indices1 pre_sorts i0 &
+          indices2 idmap pre_sorts pre_ops good_sorts i0 i1
+    }};
+}.
+
+Record TyOp@{i} (Γ : Ctx@{i}) : Type@{i+1} := {
+  ops0 : ∀ {indices0' : Type@{i}} (indices0_inc : Γ.(indices0) → indices0'),
+         OpSpec@{i} indices0';
+  ops1 : ∀ {indices0' indices1' : Type@{i}} {Sorts0'},
+    ∀ (indices0_inc : Γ.(indices0) → indices0')
+      (Sorts0 := Sorts0' o indices0_inc)
+      (indices1_inc : ∀ (i0 : Γ.(indices0)),
+       Γ.(indices1) Sorts0 i0 → Sorts0 i0 → indices1'),
+    Operations@{i} Sorts0' (ops0 indices0_inc) →
+    Operations@{i} Sorts0' (Γ.(operations0) indices0_inc) →
+    OpSpec@{i} indices1';
+}.
+Arguments ops0 {Γ} _ {indices0'} indices0_inc.
+Arguments ops1 {Γ} _ {indices0' indices1' Sorts0'}
+               indices0_inc indices1_inc ops0 Γ_ops0.
+
+(* For now, ignore infinitary arguments/indices *)
+Definition Data (Γ : Ctx) := Indices Γ.
+
+Definition data_to_op {Γ : Ctx} (A : Data Γ) : TyOp Γ
+  := {|
+        ops0 _ ix0_inc := el (ix0_inc A.1);
+        ops1 _ _ Sorts0' ix0_inc ix1_inc pt Γops := el (ix1_inc A.1 (* A.2.1 *)_ pt);
+     |}.
+
+
+(* Record IndSpec@{i} : Type@{i+1} := {
   Ix : Type@{i};
   opspec : ∀ {Ix' : Type@{i}}, (Ix → Ix') → OpSpec@{i} Ix';
 }.
@@ -61,18 +128,10 @@ Definition add_op_pr1 {S O} (A : IndAlg (add_op@{i} S O)) : IndAlg@{i} S
   := Build_IndAlg S _ A.(Ix_inj) A.(Sorts) (fst A.(ops)).
 Definition add_op_pr2 {S O} (A : IndAlg (add_op@{i} S O))
   : IndOpAlg O (add_op_pr1 A)
-  := snd A.(ops).
+  := snd A.(ops). *)
 
-(* Define semantics *)
 
-Record Ctx@{i} : Type@{i+1} := {
-  pre_ind : IndSpec@{i};
-  good_ind : IndAlg@{i} pre_ind → IndSpec@{i};
-  IISorts : ∀ pre, IndAlg@{i} (good_ind pre) → Type@{i};
-  Indices : Type@{i} := IISorts initial_alg initial_alg;
-}.
-
-Record TySort@{i} (Γ : Ctx) : Type@{i+1} := {
+(* Record TySort@{i} (Γ : Ctx) : Type@{i+1} := {
   pre_ix : Type@{i};
   good_ix : IndAlg@{i} Γ.(pre_ind) → (pre_ix → Type@{i}) → Type@{i};
   sorts_ix : ∀ pre, IndAlg@{i} (Γ.(good_ind) pre) → Type@{i};
@@ -131,3 +190,4 @@ Definition u {Γ : Ctx} : TySort Γ
 
 (* Definition ind_ix {Γ : Ctx} (A : Data Γ) (B : TySort (ext_data Γ A)) : TySort Γ
   := _. *)
+ *)
