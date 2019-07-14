@@ -98,6 +98,28 @@ Fixpoint Equations@{} (A : OpSpec@{i} I)
 (* Alternatively, have InductiveData be a relation, like in general II elim *)
 End el_op.
 
+Definition data_to_op@{i} {I : Type@{i}} : DataSpec@{i} I → OpSpec@{i} I
+  := fix include A := match A with
+     | inc i => el i
+     | inf A B => nonind_arg A (include o B)
+     end.
+
+(* is an equivalence *)
+Definition data_to_op_El@{i j} {I : Type@{i}} {El : I → Type@{j}}
+  : ∀ {A : DataSpec@{i} I},
+    ElDataSpec@{i} El A → Operations@{j} El (data_to_op A)
+  := fix map {A} := match A with
+     | inc i => idmap
+     | inf A B => λ f a, map (f a)
+     end.
+Definition op_to_data_El@{i j} {I : Type@{i}} {El : I → Type@{j}}
+  : ∀ {A : DataSpec@{i} I},
+    Operations@{j} El (data_to_op A) → ElDataSpec@{i} El A
+  := fix map {A} := match A with
+     | inc i => idmap
+     | inf A B => λ f a, map (f a)
+     end.
+
 (* is an equivalence *)
 Definition ElDataSpec_compose@{i j k} {I : Type@{i}} {J : Type@{j}}
   {f : I → J} {El : J → Type@{k}}
