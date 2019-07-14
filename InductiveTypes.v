@@ -21,6 +21,24 @@ Arguments ind_arg {I} A B.
 Arguments nonind_arg {I} A B.
 Arguments op_prod {I} A B.
 Arguments op_skip {I}.
+
+Definition functor_DataSpec@{i j} {I : Type@{i}} {J : Type@{j}} (f : I → J)
+  : DataSpec@{i} I → DataSpec@{j} J
+  := fix F A := match A with
+     | inc i => inc (f i)
+     | inf A B => inf A (F o B)
+     end.
+
+Definition functor_OpSpec@{i j} {I : Type@{i}} {J : Type@{j}} (f : I → J)
+  : OpSpec@{i} I → OpSpec@{j} J
+  := fix F A := match A with
+     | el i => el (f i)
+     | ind_arg A B => ind_arg (functor_DataSpec f A) (F B)
+     | nonind_arg A B => nonind_arg A (F o B)
+     | op_prod A B => op_prod (F A) (F B)
+     | op_skip => op_skip
+     end.
+
 Section el_op.
 Universe i.
 Context {I : Type@{i}} (X : I → Type@{i}).
@@ -79,6 +97,29 @@ Fixpoint Equations@{} (A : OpSpec@{i} I)
      end.
 (* Alternatively, have InductiveData be a relation, like in general II elim *)
 End el_op.
+
+(* is an equivalence *)
+Definition ElDataSpec_compose@{i j k} {I : Type@{i}} {J : Type@{j}}
+  {f : I → J} {El : J → Type@{k}}
+  : ∀ {A : DataSpec@{i} I},
+    ElDataSpec@{i} (El o f) A → ElDataSpec@{j} El (functor_DataSpec f A)
+  := fix comp {A} := match A with
+     | inc i => idmap
+     | inf A B => λ f a, comp (f a)
+     end.
+
+(* is an equivalence *)
+Definition Operations_compose@{i j k} {I : Type@{i}} {J : Type@{j}}
+  {f : I → J} {El : J → Type@{k}}
+  : ∀ {A : OpSpec@{i} I},
+    Operations@{j} El (functor_OpSpec f A) → Operations@{j} (El o f) A
+  := fix comp {A} := match A with
+     | el i => idmap
+     | ind_arg A B => λ f, (λ a, comp (f (ElDataSpec_compose a)))
+     | nonind_arg A B => λ f a, comp (f a)
+     | op_prod A B => λ x, (comp (fst x), comp (snd x))
+     | op_skip => λ _, tt
+     end.
 
 Module Initial.
 Section initial.

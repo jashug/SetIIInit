@@ -23,19 +23,18 @@ Module Sem.
     ext_op   (Γ : Ctx) (A : TyOp   Γ) : Ctx;
     ext_data (Γ : Ctx) (A : Data   Γ) : Ctx := ext_op Γ (data_to_op A);
 
+    inc        {Γ} (i : Indices Γ)                                  : Data   Γ;
+    inf        {Γ} (A : Type@{i}) `{IsHSet A}    (B : A → Data Γ)   : Data   Γ;
+
     u          {Γ}                                                  : TySort Γ;
     ind_ix     {Γ} (A : Data Γ) (B : TySort (ext_data Γ A))         : TySort Γ;
     nonind_ix  {Γ} (A : Type@{i}) `{IsTrunc 1 A} (B : A → TySort Γ) : TySort Γ;
 
-    el         {Γ} (i : Indices Γ)                                  : TyOp   Γ;
+    el         {Γ} (i : Indices Γ) := data_to_op (inc i)            : TyOp   Γ;
     ind_arg    {Γ} (A : Data Γ) (B : TyOp   (ext_data Γ A))         : TyOp   Γ;
     nonind_arg {Γ} (A : Type@{i}) `{IsHSet A}    (B : A → TyOp Γ)   : TyOp   Γ;
 
-    inc        {Γ} (i : Indices Γ)                                  : Data   Γ;
-    inf        {Γ} (A : Type@{i}) `{IsHSet A}    (B : A → Data Γ)   : Data   Γ;
-
     (* We expect that:
-    data_to_op (inc i) = el i,
     data_to_op (inf A f) = nonind_arg A (data_to_op o f)
     *)
   }.
