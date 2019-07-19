@@ -7,6 +7,16 @@ Cumulative Inductive DataSpec@{i} (I : Type@{i}) : Type@{i+1} :=
   | inc (i : I)
   | inf (A : Type@{i}) (B : A → DataSpec I)
 .
+
+(* An [OpSpec I] is, informally, a list of constructors for an
+[I]-indexed inductive definition.  The first three constructors [el],
+[ind_arg], and [nonind_arg] generate inductively a single constructor:
+[el] specifies the output index of the constructor, while the other
+two add inductive and non-inductive arguments respectively.  The
+"list" aspect (more precisely, a binary tree) is governed by [op_prod]
+and [op_skip].  Putting these all in the same inductive definition
+allows them to be all mixed up, but that doesn't materially affect the
+generality. *)
 Cumulative Inductive OpSpec@{i} (I : Type@{i}) : Type@{i+1} :=
   | el (i : I)
   | ind_arg (A : DataSpec@{i} I) (B : OpSpec I)
@@ -21,6 +31,23 @@ Arguments ind_arg {I} A B.
 Arguments nonind_arg {I} A B.
 Arguments op_prod {I} A B.
 Arguments op_skip {I}.
+
+(* As an example that may make this more comprehensible to category
+theorists, suppose we have a dependent polynomial, which semantically
+is a triple of morphisms:
+
+I <--p-- B --q--> A --r--> I.
+
+We represent q by a dependent type B : A -> Type and the other two by
+functions r : A -> I and p : ∀ a, B a -> I. *)
+Section DependentPolynomial.
+  Context (I : Type) (A : Type) (B : A -> Type) (r : A -> I) (p : ∀ a, B a -> I).
+  (* The constructors of the corresponding indexed inductive type (the
+     putative initial algebra for this dependent polynomial functor)
+     are then, in the above syntax: *)
+  Definition OpSpec_DepPoly : OpSpec I
+    := nonind_arg A (λ a, ind_arg (inf (B a) (λ b, inc (p a b))) (el (r a))).
+End DependentPolynomial.
 
 Definition functor_DataSpec@{i j} {I : Type@{i}} {J : Type@{j}} (f : I → J)
   : DataSpec@{i} I → DataSpec@{j} J
@@ -39,6 +66,11 @@ Definition functor_OpSpec@{i j} {I : Type@{i}} {J : Type@{j}} (f : I → J)
      | op_skip => op_skip
      end.
 
+(* Now we define the "algebra structure" corresponding to a given list
+of constructors [A : OpSpec I].  Given [X : I -> Type], an element of
+[Operations X A] is an "[A]-algebra structure" on [X], and the
+intended indexed inductive definition should be the initial such
+[A]-algebra. *)
 Section el_op.
 Universe i.
 Context {I : Type@{i}} (X : I → Type@{i}).
@@ -56,6 +88,14 @@ Fixpoint Operations@{} (A : OpSpec@{i} I) : Type@{i}
      | op_skip => Unit
      end.
 
+(* We can check that this produces the correct result on a dependent
+polynomial:
+
+Eval compute in (λ A B r p, Operations (OpSpec_DepPoly I A B r p)).
+ ==> λ A B r p, ∀ a : A, (∀ b : B a, X (p a b)) → X (r a) *)
+
+(* Next we specify the notion of "dependent algebra structure", which
+gives the hypotheses of the desired eliminator. *)
 Universe j.
 Constraint i <= j. (* Don't consider eliminating into smaller universes *)
 Context (P : ∀ i, X i → Type@{j}).
@@ -75,6 +115,14 @@ Fixpoint Methods@{} (A : OpSpec@{i} I)
      | op_skip => λ _, Unit
      end.
 
+(*
+Eval compute in (λ A B r p (op : Operations (OpSpec_DepPoly I A B r p)), Methods (OpSpec_DepPoly I A B r p) op).
+==> λ A B r p op,
+  ∀ (a : A) (x : ∀ b : B a, X (p a b)),
+  (∀ b : B a, P (p a b) (x b)) → P (r a) (op a x)
+*)
+
+(* Finally, we specify the computation equations that a putative solution to the elimination rule ought to satisfy. *)
 Context (E : ∀ i x, P i x).
 Fixpoint InductiveData@{} (A : DataSpec@{i} I)
   : ∀ x, InductiveHypothesis A x
@@ -96,6 +144,14 @@ Fixpoint Equations@{} (A : OpSpec@{i} I)
        Unit
      end.
 (* Alternatively, have InductiveData be a relation, like in general II elim *)
+
+(*
+Eval compute in (λ A B r p (op : Operations (OpSpec_DepPoly I A B r p)) m, Equations (OpSpec_DepPoly I A B r p) op m).
+==> λ A B r p op m, 
+  ∀ (a : A) (x : ∀ b : B a, X (p a b)),
+    E (r a) (op a x) = m a x (λ b : B a, E (p a b) (x b))
+*)
+
 End el_op.
 
 Definition data_to_op@{i} {I : Type@{i}} : DataSpec@{i} I → OpSpec@{i} I
