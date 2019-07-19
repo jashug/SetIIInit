@@ -1,4 +1,4 @@
-Require Import HoTT.Basics Coq.Unicode.Utf8.
+Require Import HoTT.Basics HoTT.Utf8.
 
 (* Indexed Inductive Definitions *)
 
