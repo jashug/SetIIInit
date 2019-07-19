@@ -49,6 +49,82 @@ Section DependentPolynomial.
     := nonind_arg A (λ a, ind_arg (inf (B a) (λ b, inc (p a b))) (el (r a))).
 End DependentPolynomial.
 
+(* Conversely, we can turn an [OpSpec] into a dependent polynomial. *)
+Section ToDepPoly.
+  Context {I : Type}.
+  Fixpoint constructors (op : OpSpec I) : Type
+    := match op with
+       | el i => Unit
+       | ind_arg A B => constructors B
+       | nonind_arg A B => { a : A & constructors (B a) }
+       | op_prod A B => constructors A + constructors B
+       | op_skip => Empty
+       end.
+  Fixpoint out_index (op : OpSpec I) : constructors op -> I
+    := match op return constructors op -> I with
+       | el i => λ _, i
+       | ind_arg A B => out_index B
+       | nonind_arg A B => λ ab, out_index (B ab.1) ab.2
+       | op_prod A B => λ ab, match ab with
+                              | inl a => out_index A a
+                              | inr b => out_index B b
+                              end
+       | op_skip => Empty_rec I
+       end.
+  Fixpoint argdata (dt : DataSpec I) : Type
+    := match dt with
+       | inc i => Unit
+       | inf A B => { a : A & argdata (B a) }
+       end.
+  Fixpoint arguments (op : OpSpec I) : constructors op -> Type
+    := match op return constructors op -> Type with
+       | el i => λ _, Empty
+       | ind_arg A B => λ c, argdata A + arguments B c
+       | nonind_arg A B => λ ab, arguments (B ab.1) ab.2
+       | op_prod A B => λ ab, match ab with
+                              | inl a => arguments A a
+                              | inr b => arguments B b
+                              end
+       | op_skip => Empty_rec Type
+       end.
+  Fixpoint arg_index (dt : DataSpec I) : argdata dt -> I
+    := match dt return argdata dt -> I with
+       | inc i => λ _, i
+       | inf A B => λ ab, arg_index (B ab.1) ab.2
+       end.
+  Fixpoint in_index (op : OpSpec I) : ∀ c, arguments op c -> I
+    := match op return ∀ c, arguments op c -> I with
+       | el i => λ _, Empty_rec I
+       | ind_arg A B => λ c xy, match xy with
+                                | inl x => arg_index A x
+                                | inr y => in_index B c y
+                                end
+       | nonind_arg A B => λ ab x, in_index (B ab.1) ab.2 x
+       | op_prod A B => λ ab, match ab with
+                                | inl a => in_index A a
+                                | inr b => in_index B b
+                                end
+       | op_skip => Empty_ind (λ c, arguments op_skip c -> I)
+       end.
+
+  (* If we start from a dependent polynomial, then this recaptures it,
+  up to trivialities like Σs over Unit or coproducts with Empty. *)
+  Context (A : Type) (B : A -> Type) (r : A -> I) (p : ∀ a, B a -> I).
+  Eval compute in (constructors (OpSpec_DepPoly I A B r p)).
+  (* ==> ∃ _ : A, Unit *)
+  Eval compute in (out_index (OpSpec_DepPoly I A B r p)).
+  (* ==> λ ab, r ab.1 *)
+  Eval compute in (arguments (OpSpec_DepPoly I A B r p)).
+  (* ==> λ ab, (∃ _ : B ab ₁, Unit) ⊔ Empty *)
+  Eval compute in (in_index (OpSpec_DepPoly I A B r p)).
+  (* ==> λ ab xy,
+       match xy with
+       | inl x => p ab.1 x.1
+       | inr y => match y return I with end
+       end
+   *)
+End ToDepPoly.
+
 Definition functor_DataSpec@{i j} {I : Type@{i}} {J : Type@{j}} (f : I → J)
   : DataSpec@{i} I → DataSpec@{j} J
   := fix F A := match A with
