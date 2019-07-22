@@ -205,3 +205,7 @@ Definition nonind_arg {Γ} (A : Type@{i}) (* `{IsHSet A} *) (B : A → TyOp Γ)
         ops1 Sorts0 ops0Γ ops0 :=
           nonind_arg A (λ a, (B a).(ops1) ops0Γ (ops0 a));
      |}.
+
+Definition data_to_op_inf Γ A (f : A → Data Γ)
+  : data_to_op (inf A f) = nonind_arg A (data_to_op o f)
+  := 1.
