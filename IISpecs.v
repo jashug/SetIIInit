@@ -24,7 +24,7 @@ Module Sem.
     ext_data (Γ : Ctx) (A : Data   Γ) : Ctx := ext_op Γ (data_to_op A);
 
     inc        {Γ} (i : Indices Γ)                                  : Data   Γ;
-    inf        {Γ} (A : Type@{i}) `{IsHSet A}    (B : A → Data Γ)   : Data   Γ;
+    inf        {Γ} (A : Type@{i}) `{IsHSet A}    (B : A → Indices Γ): Data   Γ;
 
     u          {Γ}                                                  : TySort Γ;
     ind_ix     {Γ} (A : Data Γ) (B : TySort (ext_data Γ A))         : TySort Γ;
@@ -48,7 +48,7 @@ Context (sem : Sem.t@{i U}).
 (* Close Indices under external products *)
 Inductive Data (Indices : Type@{i}) : Type@{i+1} :=
   | inc (i : Indices)
-  | inf (A : Type@{i}) `{IsHSet A} (B : A → Data Indices)
+  | inf (A : Type@{i}) `{IsHSet A} (B : A → Indices)
 .
 Global Arguments inc {Indices} i.
 Global Arguments inf {Indices} A {_} B.
@@ -56,7 +56,7 @@ Fixpoint ElData {Γ : sem.(Sem.Ctx)} (A : Data (sem.(Sem.Indices) Γ))
   : sem.(Sem.Data) Γ
   := match A with
      | inc i => sem.(Sem.inc) i
-     | inf A _ B => sem.(Sem.inf) A (ElData o B)
+     | inf A _ B => sem.(Sem.inf) A B
      end.
 
 (*TySort and TyOp use Γ as a large non-uniform parameter, but not essentially*)
@@ -96,7 +96,7 @@ Fixpoint ElTyOp {Γ} (A : TyOp Γ) : sem.(Sem.TyOp) Γ
 Fixpoint data_to_op {Γ} (A : Data (sem.(Sem.Indices) Γ)) : TyOp Γ
   := match A with
      | inc i => el i
-     | inf A _ B => nonind_arg A (data_to_op o B)
+     | inf A _ B => nonind_arg A (el o B)
      end.
 (*
 If the equations in the semantics hold definitionally then

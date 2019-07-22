@@ -4,8 +4,8 @@ Require Import HoTT.Basics HoTT.Utf8.
 
 (* Specify the operations of an inductive definition *)
 Cumulative Inductive DataSpec@{i} (I : Type@{i}) : Type@{i+1} :=
-  | inc (i : I)
-  | inf (A : Type@{i}) (B : A → DataSpec I)
+  | single_argument (i : I)
+  | infinitary_argument (A : Type@{i}) (B : A → I)
 .
 
 (* An [OpSpec I] is, informally, a list of constructors for an
@@ -24,8 +24,8 @@ Cumulative Inductive OpSpec@{i} (I : Type@{i}) : Type@{i+1} :=
   | op_prod (A B : OpSpec I)
   | op_skip
 .
-Arguments inc {I} i.
-Arguments inf {I} A B.
+Arguments single_argument {I} i.
+Arguments infinitary_argument {I} A B.
 Arguments el {I} i.
 Arguments ind_arg {I} A B.
 Arguments nonind_arg {I} A B.
@@ -46,7 +46,7 @@ Section DependentPolynomial.
      putative initial algebra for this dependent polynomial functor)
      are then, in the above syntax: *)
   Definition OpSpec_DepPoly : OpSpec I
-    := nonind_arg A (λ a, ind_arg (inf (B a) (λ b, inc (p a b))) (el (r a))).
+    := nonind_arg A (λ a, ind_arg (infinitary_argument (B a) (p a)) (el (r a))).
 End DependentPolynomial.
 
 (* Conversely, we can turn an [OpSpec] into a dependent polynomial. *)
@@ -71,10 +71,10 @@ Section ToDepPoly.
                               end
        | op_skip => Empty_rec I
        end.
-  Fixpoint argdata (dt : DataSpec I) : Type
+  Definition argdata (dt : DataSpec I) : Type
     := match dt with
-       | inc i => Unit
-       | inf A B => { a : A & argdata (B a) }
+       | single_argument i => Unit
+       | infinitary_argument A B => A
        end.
   Fixpoint arguments (op : OpSpec I) : constructors op -> Type
     := match op return constructors op -> Type with
@@ -87,10 +87,10 @@ Section ToDepPoly.
                               end
        | op_skip => Empty_rec Type
        end.
-  Fixpoint arg_index (dt : DataSpec I) : argdata dt -> I
+  Definition arg_index (dt : DataSpec I) : argdata dt -> I
     := match dt return argdata dt -> I with
-       | inc i => λ _, i
-       | inf A B => λ ab, arg_index (B ab.1) ab.2
+       | single_argument i => λ _, i
+       | infinitary_argument A B => B
        end.
   Fixpoint in_index (op : OpSpec I) : ∀ c, arguments op c -> I
     := match op return ∀ c, arguments op c -> I with
@@ -115,11 +115,11 @@ Section ToDepPoly.
   Eval compute in (out_index (OpSpec_DepPoly I A B r p)).
   (* ==> λ ab, r ab.1 *)
   Eval compute in (arguments (OpSpec_DepPoly I A B r p)).
-  (* ==> λ ab, (∃ _ : B ab ₁, Unit) ⊔ Empty *)
+  (* ==> λ ab, B ab ₁ ⊔ Empty *)
   Eval compute in (in_index (OpSpec_DepPoly I A B r p)).
   (* ==> λ ab xy,
        match xy with
-       | inl x => p ab.1 x.1
+       | inl x => p ab.1 x
        | inr y => match y return I with end
        end
    *)
@@ -127,9 +127,9 @@ End ToDepPoly.
 
 Definition functor_DataSpec@{i j} {I : Type@{i}} {J : Type@{j}} (f : I → J)
   : DataSpec@{i} I → DataSpec@{j} J
-  := fix F A := match A with
-     | inc i => inc (f i)
-     | inf A B => inf A (F o B)
+  := λ A, match A with
+     | single_argument i => single_argument (f i)
+     | infinitary_argument A B => infinitary_argument A (f o B)
      end.
 
 Definition functor_OpSpec@{i j} {I : Type@{i}} {J : Type@{j}} (f : I → J)
@@ -149,15 +149,15 @@ intended indexed inductive definition should be the initial such
 [A]-algebra. *)
 Section el_op.
 Universe i.
-Context {I : Type@{i}} (X : I → Type@{i}).
-Fixpoint ElDataSpec@{} (A : DataSpec@{i} I) : Type@{i}
+Context {I : Type@{i}} (Xin Xout : I → Type@{i}).
+Definition ElDataSpec@{} (A : DataSpec@{i} I) : Type@{i}
   := match A with
-     | inc i => X i
-     | inf A B => ∀ a, ElDataSpec (B a)
+     | single_argument i => Xin i
+     | infinitary_argument A B => ∀ a, Xin (B a)
      end.
 Fixpoint Operations@{} (A : OpSpec@{i} I) : Type@{i}
   := match A with
-     | el i => X i
+     | el i => Xout i
      | ind_arg A B => ElDataSpec A → Operations B
      | nonind_arg A B => ∀ a, Operations (B a)
      | op_prod A B => Operations A * Operations B
@@ -168,23 +168,23 @@ Fixpoint Operations@{} (A : OpSpec@{i} I) : Type@{i}
 polynomial:
 
 Eval compute in (λ A B r p, Operations (OpSpec_DepPoly I A B r p)).
- ==> λ A B r p, ∀ a : A, (∀ b : B a, X (p a b)) → X (r a) *)
+ ==> λ A B r p, ∀ a : A, (∀ b : B a, Xin (p a b)) → Xout (r a) *)
 
 (* Next we specify the notion of "dependent algebra structure", which
 gives the hypotheses of the desired eliminator. *)
 Universe j.
 Constraint i <= j. (* Don't consider eliminating into smaller universes *)
-Context (P : ∀ i, X i → Type@{j}).
-Fixpoint InductiveHypothesis@{} (A : DataSpec@{i} I)
+Context (Pin : ∀ i, Xin i → Type@{j}) (Pout : ∀ i, Xout i → Type@{j}).
+Definition InductiveHypothesis@{} (A : DataSpec@{i} I)
   : ElDataSpec A → Type@{j}
   := match A return ElDataSpec A → Type@{_} with
-     | inc i => P i
-     | inf A B => λ f, ∀ a, InductiveHypothesis (B a) (f a)
+     | single_argument i => Pin i
+     | infinitary_argument A B => λ f, ∀ a, Pin (B a) (f a)
      end.
 Fixpoint Methods@{} (A : OpSpec@{i} I)
   : Operations A → Type@{j}
   := match A return Operations A → Type@{_} with
-     | el i => P i
+     | el i => Pout i
      | ind_arg A B => λ f, ∀ x, InductiveHypothesis A x → Methods B (f x)
      | nonind_arg A B => λ f, ∀ a, Methods (B a) (f a)
      | op_prod A B => λ x, Methods A (fst x) * Methods B (snd x)
@@ -199,17 +199,17 @@ Eval compute in (λ A B r p (op : Operations (OpSpec_DepPoly I A B r p)), Method
 *)
 
 (* Finally, we specify the computation equations that a putative solution to the elimination rule ought to satisfy. *)
-Context (E : ∀ i x, P i x).
-Fixpoint InductiveData@{} (A : DataSpec@{i} I)
+Context (Ein : ∀ i x, Pin i x) (Eout : ∀ i x, Pout i x).
+Definition InductiveData@{} (A : DataSpec@{i} I)
   : ∀ x, InductiveHypothesis A x
   := match A return ∀ x, InductiveHypothesis A x with
-     | inc i => E i
-     | inf A B => λ f a, InductiveData (B a) (f a)
+     | single_argument i => Ein i
+     | infinitary_argument A B => λ f a, Ein (B a) (f a)
      end.
 Fixpoint Equations@{} (A : OpSpec@{i} I)
   : ∀ op, Methods A op → Type@{j}
   := match A return ∀ op, Methods A op → Type@{_} with
-     | el i => λ x y, E i x = y
+     | el i => λ x y, Eout i x = y
      | ind_arg A B => λ f f',
        ∀ x, Equations B (f x) (f' x (InductiveData A x))
      | nonind_arg A B => λ f f',
@@ -231,25 +231,25 @@ Eval compute in (λ A B r p (op : Operations (OpSpec_DepPoly I A B r p)) m, Equa
 End el_op.
 
 Definition data_to_op@{i} {I : Type@{i}} : DataSpec@{i} I → OpSpec@{i} I
-  := fix include A := match A with
-     | inc i => el i
-     | inf A B => nonind_arg A (include o B)
+  := λ A, match A with
+     | single_argument i => el i
+     | infinitary_argument A B => nonind_arg A (el o B)
      end.
 
 (* is an equivalence *)
 Definition data_to_op_El@{i j} {I : Type@{i}} {El : I → Type@{j}}
   : ∀ {A : DataSpec@{i} I},
-    ElDataSpec@{i} El A → Operations@{j} El (data_to_op A)
-  := fix map {A} := match A with
-     | inc i => idmap
-     | inf A B => λ f a, map (f a)
+    ElDataSpec@{i} El A → Operations@{j} El El (data_to_op A)
+  := λ {A}, match A with
+     | single_argument i => idmap
+     | infinitary_argument A B => idmap
      end.
 Definition op_to_data_El@{i j} {I : Type@{i}} {El : I → Type@{j}}
   : ∀ {A : DataSpec@{i} I},
-    Operations@{j} El (data_to_op A) → ElDataSpec@{i} El A
-  := fix map {A} := match A with
-     | inc i => idmap
-     | inf A B => λ f a, map (f a)
+    Operations@{j} El El (data_to_op A) → ElDataSpec@{i} El A
+  := λ {A}, match A with
+     | single_argument i => idmap
+     | infinitary_argument A B => idmap
      end.
 
 (* is an equivalence *)
@@ -257,16 +257,17 @@ Definition ElDataSpec_compose@{i j k} {I : Type@{i}} {J : Type@{j}}
   {f : I → J} {El : J → Type@{k}}
   : ∀ {A : DataSpec@{i} I},
     ElDataSpec@{i} (El o f) A → ElDataSpec@{j} El (functor_DataSpec f A)
-  := fix comp {A} := match A with
-     | inc i => idmap
-     | inf A B => λ f a, comp (f a)
+  := λ {A}, match A with
+     | single_argument i => idmap
+     | infinitary_argument A B => idmap
      end.
 
 (* is an equivalence *)
 Definition Operations_compose@{i j k} {I : Type@{i}} {J : Type@{j}}
   {f : I → J} {El : J → Type@{k}}
   : ∀ {A : OpSpec@{i} I},
-    Operations@{j} El (functor_OpSpec f A) → Operations@{j} (El o f) A
+    Operations@{j} El El (functor_OpSpec f A) →
+    Operations@{j} (El o f) (El o f) A
   := fix comp {A} := match A with
      | el i => idmap
      | ind_arg A B => λ f, (λ a, comp (f (ElDataSpec_compose a)))
@@ -275,49 +276,367 @@ Definition Operations_compose@{i j k} {I : Type@{i}} {J : Type@{j}}
      | op_skip => λ _, tt
      end.
 
+Definition functor_ElDataSpec {I : Type@{i}} {Elin1 Elin2 : I → Type@{i}}
+  (Fin : ∀ i, Elin2 i → Elin1 i)
+  : ∀ {A : DataSpec@{i} I},
+    ElDataSpec@{i} Elin2 A → ElDataSpec@{i} Elin1 A
+  := λ {A}, match A return ElDataSpec@{i} Elin2 A → ElDataSpec@{i} Elin1 A with
+     | single_argument i => Fin i
+     | infinitary_argument A B => λ f a, Fin _ (f a)
+     end.
+Definition functor_Operations {I : Type@{i}}
+  {Elin1 Elin2 Elout1 Elout2 : I → Type@{i}}
+  (Fin : ∀ i, Elin2 i → Elin1 i) (Fout : ∀ i, Elout1 i → Elout2 i)
+  : ∀ {A : OpSpec@{i} I},
+    Operations@{i} Elin1 Elout1 A →
+    Operations@{i} Elin2 Elout2 A
+  := fix func {A} := match A with
+     | el i => Fout i
+     | ind_arg A B => λ f a, func (f (functor_ElDataSpec Fin a))
+     | nonind_arg A B => λ f a, func (f a)
+     | op_prod A B => λ x, (func (fst x), func (snd x))
+     | op_skip => λ _, tt
+     end.
+Definition functor_Operations1 {I : Type@{i}}
+  {Elin Elout1 Elout2 : I → Type@{i}}
+  (Fout : ∀ i, Elout1 i → Elout2 i)
+  : ∀ {A : OpSpec@{i} I},
+    Operations@{i} Elin Elout1 A →
+    Operations@{i} Elin Elout2 A
+  := fix func {A} := match A with
+     | el i => Fout i
+     | ind_arg A B => λ f a, func (f a)
+     | nonind_arg A B => λ f a, func (f a)
+     | op_prod A B => λ x, (func (fst x), func (snd x))
+     | op_skip => λ _, tt
+     end.
+Definition functor_Methods1 {I : Type@{i}}
+  {Elin Elout1 Elout2 : I → Type@{i}}
+  (FElout : ∀ i, Elout1 i → Elout2 i)
+  {Pin : ∀ i, Elin i → Type@{j}}
+  {Pout1 : ∀ i, Elout1 i → Type@{j}} {Pout2 : ∀ i, Elout2 i → Type@{j}}
+  (FPout : ∀ i x, Pout1 i x → Pout2 i (FElout i x))
+  : ∀ {A : OpSpec@{i} I} {ops : Operations@{i} Elin Elout1 A},
+    Methods@{i j} Elin Elout1 Pin Pout1 A ops →
+    Methods@{i j} Elin Elout2 Pin Pout2 A (functor_Operations1 FElout ops)
+  := fix func {A} := match A with
+     | el i => FPout i
+     | ind_arg A B => λ ops f a x, func (ops a) (f a x)
+     | nonind_arg A B => λ ops f a, func (ops a) (f a)
+     | op_prod A B => λ ops x, (func (fst ops) (fst x), func (snd ops) (snd x))
+     | op_skip => λ _ _, tt
+     end.
+Definition functor_Methods1_rev {I : Type@{i}}
+  {Elin Elout1 Elout2 : I → Type@{i}}
+  (FElout : ∀ i, Elout1 i → Elout2 i)
+  {Pin : ∀ i, Elin i → Type@{j}}
+  {Pout1 : ∀ i, Elout1 i → Type@{j}} {Pout2 : ∀ i, Elout2 i → Type@{j}}
+  (FPout : ∀ i x, Pout2 i (FElout i x) → Pout1 i x)
+  : ∀ {A : OpSpec@{i} I} {ops : Operations@{i} Elin Elout1 A},
+    Methods@{i j} Elin Elout2 Pin Pout2 A (functor_Operations1 FElout ops) →
+    Methods@{i j} Elin Elout1 Pin Pout1 A ops
+  := fix func {A} := match A with
+     | el i => FPout i
+     | ind_arg A B => λ ops f a x, func (ops a) (f a x)
+     | nonind_arg A B => λ ops f a, func (ops a) (f a)
+     | op_prod A B => λ ops x, (func (fst ops) (fst x), func (snd ops) (snd x))
+     | op_skip => λ _ _, tt
+     end.
+Definition functor_Methods0_rev {I : Type@{i}}
+  {Elin Elout1 Elout2 : I → Type@{i}}
+  (Fout : ∀ i, Elout1 i → Elout2 i)
+  {Pin : ∀ i, Elin i → Type@{j}}
+  {Pout2 : ∀ i, Elout2 i → Type@{j}}
+  (Pout1 : ∀ i, Elout1 i → Type@{j} := λ i, Pout2 i o Fout i)
+  : ∀ {A : OpSpec@{i} I} {ops : Operations@{i} Elin Elout1 A},
+    Methods@{i j} Elin Elout2 Pin Pout2 A (functor_Operations1 Fout ops) →
+    Methods@{i j} Elin Elout1 Pin Pout1 A ops
+  := fix func {A} : ∀ {ops}, _ → _ := match A with
+     | el i => λ x, idmap
+     | ind_arg A B => λ ops f a x, func (f a x)
+     | nonind_arg A B => λ ops f a, func (f a)
+     | op_prod A B => λ ops x, (func (fst x), func (snd x))
+     | op_skip => λ _ _, tt
+     end.
+Definition functor_Methods0 {I : Type@{i}}
+  {Elin Elout1 Elout2 : I → Type@{i}}
+  (Fout : ∀ i, Elout1 i → Elout2 i)
+  {Pin : ∀ i, Elin i → Type@{j}}
+  {Pout2 : ∀ i, Elout2 i → Type@{j}}
+  (Pout1 : ∀ i, Elout1 i → Type@{j} := λ i, Pout2 i o Fout i)
+  : ∀ {A : OpSpec@{i} I} {ops : Operations@{i} Elin Elout1 A},
+    Methods@{i j} Elin Elout1 Pin Pout1 A ops →
+    Methods@{i j} Elin Elout2 Pin Pout2 A (functor_Operations1 Fout ops)
+  := fix func {A} : ∀ {ops}, _ → _ := match A with
+     | el i => λ x, idmap
+     | ind_arg A B => λ ops f a x, func (f a x)
+     | nonind_arg A B => λ ops f a, func (f a)
+     | op_prod A B => λ ops x, (func (fst x), func (snd x))
+     | op_skip => λ _ _, tt
+     end.
+
+Definition functor_Equations0_rev {I : Type@{i}}
+  {Elin Elout1 Elout2 : I → Type@{i}}
+  (Fout : ∀ i, Elout1 i → Elout2 i)
+  {Pin : ∀ i, Elin i → Type@{j}}
+  {Pout2 : ∀ i, Elout2 i → Type@{j}}
+  (Pout1 : ∀ i, Elout1 i → Type@{j} := λ i, Pout2 i o Fout i)
+  {Ein : ∀ i x, Pin i x}
+  {Eout2 : ∀ i x, Pout2 i x}
+  (Eout1 : ∀ i x, Pout1 i x := λ i x, Eout2 i (Fout i x))
+  : ∀ {A : OpSpec@{i} I} {ops : Operations@{i} Elin Elout1 A}
+      {M : Methods@{i j} Elin Elout2 Pin Pout2 A
+           (functor_Operations1 Fout ops)},
+    Equations@{i j} Elin Elout1 Pin Pout1 Ein Eout1 A ops
+      (functor_Methods0_rev Fout M) →
+    Equations@{i j} Elin Elout2 Pin Pout2 Ein Eout2 A
+      (functor_Operations1 Fout ops) M
+  := fix func {A} : ∀ {ops M}, _ → _ := match A with
+     | el i => λ ops M, idmap
+     | ind_arg A B => λ ops M f a, func (f a)
+     | nonind_arg A B => λ ops M f a, func (f a)
+     | op_prod A B => λ ops M x,
+       (func (fst x),
+        func (snd x))
+     | op_skip => λ _ _ _, tt
+     end.
+
 Module Initial.
 Section initial.
 
 (* TODO: prove we have sorts and operations that satisfy the eliminator *)
 
 Universe i.
-Context {I : Type@{i}} (A : OpSpec@{i} I).
+Context {I : Type@{i}}.
 
-Definition sorts : I → Type@{i}.
-Admitted.
+(* Section test_constructors. *)
+Context (A : OpSpec@{i} I).
 
-Definition operations : Operations@{i} sorts A.
-Admitted.
+Local Notation "( ? p )" := (λ A, match A with p => Unit | _ => Empty end)
+  (p pattern).
+Local Notation "( ' p => x )" :=
+  (λ A, match A as A return ∀ H : (? p) A, _ with
+   | p => λ _, x
+   | _ => λ XX, match XX in Empty with end
+   end)
+  (p pattern).
+
+Record infinitary_argument_data := {
+  inf_arg_data_A : Type@{i};
+  inf_arg_data_B : inf_arg_data_A → I
+}.
+Inductive init_Data@{} (El : I → Type@{i}) (A' : DataSpec@{i} I) : Type@{i} :=
+  | init_inc (H : (? single_argument _) A')
+    (_ : El (('single_argument i => i) A' H))
+  | init_inf (H : (? infinitary_argument _ _) A')
+    (_ : let '{|inf_arg_data_A:=A; inf_arg_data_B:=B|}
+          := ('infinitary_argument A B =>
+              {|inf_arg_data_A:=A; inf_arg_data_B:=B|}) A' H in
+         ∀ a : A, El (B a))
+.
+Definition init_Data_inc_rect {El i} (P : init_Data El (single_argument i) → Type@{j})
+  (IS : ∀ x, P (init_inc El (single_argument i) tt x)) : ∀ X, P X
+  := λ X, match X with
+     | init_inc tt x => IS x
+     | init_inf XX _ => match XX with end
+     end.
+Definition init_Data_inf_rect {El A B} (P : init_Data El (infinitary_argument A B) → Type@{j})
+  (IS : ∀ f, P (init_inf El (infinitary_argument A B) tt f)) : ∀ X, P X
+  := λ X, match X with
+     | init_inc XX _ => match XX with end
+     | init_inf tt f => IS f
+     end.
+(* is an equivalence *)
+Fixpoint init_Data_to_ElDataSpec {El} (A : DataSpec@{i} I)
+  : init_Data El A → ElDataSpec El A
+  := match A with
+     | single_argument i => init_Data_inc_rect
+       (λ _, ElDataSpec El (single_argument i))
+       idmap
+     | infinitary_argument A B => init_Data_inf_rect
+       (λ _, ElDataSpec El (infinitary_argument A B))
+       idmap
+     end.
+Fixpoint ElDataSpec_to_init_Data {El} (A : DataSpec@{i} I)
+  : ElDataSpec El A → init_Data El A
+  := match A with
+     | single_argument i as A' => init_inc El A' tt
+     | infinitary_argument A B as A' => init_inf El A' tt
+     end.
+
+Record infinitary_cons_data := {
+  inf_cons_data_A : Type@{i};
+  inf_cons_data_B : inf_cons_data_A → OpSpec@{i} I
+}.
+Inductive init@{} (A' : OpSpec@{i} I) (i : I) : Type@{i} :=
+  | init_el (H : (? el _) A')
+    (_ : ('el j => j) A' H = i)
+  | init_ind_arg (H : (? ind_arg _ _) A')
+    (_ : init_Data (init A) (('ind_arg A _ => A) A' H))
+    (_ : init (('ind_arg _ B => B) A' H) i)
+  | init_nonind_arg (H : (? nonind_arg _ _) A')
+    (AB := ('nonind_arg A B =>
+            {|inf_cons_data_A:=A; inf_cons_data_B:=B|}) A' H)
+    (a : AB.(inf_cons_data_A))
+    (_ : init (AB.(inf_cons_data_B) a) i)
+  | init_op_prod_l (H : (? op_prod _ _) A')
+    (_ : init (('op_prod A _ => A) A' H) i)
+  | init_op_prod_r (H : (? op_prod _ _) A')
+    (_ : init (('op_prod _ B => B) A' H) i)
+.
+
+(* End test_constructors. *)
+
+(* Context  (A : OpSpec@{i} I). *)
+
+Definition sorts : I → Type@{i} := init A.
+
+Fixpoint operations_helper A'
+  : Operations@{i} sorts (init A') A'
+  := match A' return Operations@{i} sorts (init A') A' with
+     | el i as A' => init_el A' _ tt 1
+     | ind_arg A B as A' => λ a, functor_Operations1
+       (λ i, init_ind_arg A' i tt (ElDataSpec_to_init_Data _ a))
+       (operations_helper B)
+     | nonind_arg A B as A' => λ a, functor_Operations1
+       (λ i, init_nonind_arg A' i tt a)
+       (operations_helper (B a))
+     | op_prod A B as A' =>
+       (functor_Operations1 (λ i, init_op_prod_l A' i tt) (operations_helper A),
+        functor_Operations1 (λ i, init_op_prod_r A' i tt) (operations_helper B))
+     | op_skip as A' => tt
+     end.
+Definition operations : Operations@{i} sorts sorts A
+  := operations_helper A.
 
 Section dependent_eliminator.
 Universe j.
 Constraint i <= j.
 Context
   (P : ∀ i, sorts i → Type@{j})
-  (M : Methods@{i j} sorts P A operations)
+  (M : Methods@{i j} sorts sorts P P A operations)
 .
 
-Definition eliminators : ∀ i x, P i x.
-Admitted.
+Local Notation "( @ p => IS & A H => P )"
+  := (λ A', match A' as A return ∀ H : (? p) A, P with
+      | p => λ 'tt, IS
+      | _ => λ XX, match XX with end
+      end)
+     (p pattern, A ident, H ident).
 
-Definition equations : Equations@{i j} sorts P eliminators A operations M.
-Admitted.
+Fixpoint eliminators_helper A' i (x : init A' i) {struct x}
+  : ∀ P2,
+    Methods@{i j} sorts (init A') P P2 A' (operations_helper A') →
+    P2 i x
+  := let P' A' i x
+      := ∀ P2,
+         Methods@{i j} sorts (init A') P P2 A' (operations_helper A') →
+         P2 i x in
+     match x with
+     | init_el H p as x =>
+       (@ el i => λ p, match p with idpath => λ H, idmap end &
+        A' H => ∀ p, P' A' i (init_el _ _ H p))
+       A' H p
+     | init_ind_arg H a b =>
+       (@ ind_arg A B => λ a, λ b IH H M', IH _
+          (let P2 A' a := ∀ H,
+             Methods sorts _ P H (ind_arg A' B)
+               (operations_helper (ind_arg A' B)) →
+             Methods sorts _ P
+             (λ i, H i ∘ init_ind_arg (ind_arg A' B) i tt a)
+             B (operations_helper B) in
+           match a return P2 A a with
+           | init_inc H2 x =>
+             (@ single_argument i => λ x H (M' : ∀ a, _), functor_Methods0_rev _
+                (M' _ (eliminators_helper _ _ x P M)) &
+              A' H2 => ∀ x, P2 A' (init_inc _ A' H2 x))
+             A H2 x
+           | init_inf H2 f =>
+             (@ infinitary_argument A2 B2 => λ f H M', functor_Methods0_rev _
+                (M' _ (λ a2, eliminators_helper _ _ (f a2) P M)) &
+              A' H2 => ∀ f, P2 A' (init_inf _ A' H2 f))
+             A H2 f
+           end H M') &
+        A' H => ∀ a b, P' _ i b → P' A' i (init_ind_arg _ _ H a b))
+       A' H a b (eliminators_helper _ i b)
+     | init_nonind_arg H a b =>
+       (@ nonind_arg A B => λ a b H M',
+          eliminators_helper (B a) i b _
+          (functor_Methods0_rev _ (M' a)) &
+        A' H => ∀ a b, P' A' i (init_nonind_arg _ _ H a b))
+       A' H a b
+     | init_op_prod_l H a =>
+       (@ op_prod A B => λ a H M',
+          eliminators_helper A i a _
+          (functor_Methods0_rev _ (fst M')) &
+        A' H => ∀ a, P' A' i (init_op_prod_l _ _ H a))
+       A' H a
+     | init_op_prod_r H b =>
+       (@ op_prod A B => λ b H M',
+          eliminators_helper B i b (λ i, H i o _)
+          (functor_Methods0_rev _ (snd M')) &
+        A' H => ∀ b, P' A' i (init_op_prod_r _ _ H b))
+       A' H b
+     end.
+
+Definition eliminators i x : P i x
+  := eliminators_helper A i x P M.
+
+Fixpoint equations_helper A'
+  : ∀ P2 M, Equations@{i j} sorts (init A') P P2
+            eliminators (λ i x, eliminators_helper A' i x P2 M)
+            A' (operations_helper A') M
+  := match A' with
+     | el i => λ P2 M, idpath
+     | ind_arg (single_argument i) B => λ P2 M a,
+       functor_Equations0_rev _ (equations_helper B _ _)
+     | ind_arg (infinitary_argument A B2) B => λ P2 M a,
+       functor_Equations0_rev _ (equations_helper _ _ _)
+     | nonind_arg A B => λ P2 M a,
+       functor_Equations0_rev _ (equations_helper _ _ _)
+     | op_prod A B => λ P2 M,
+       (functor_Equations0_rev _ (equations_helper _ _ _),
+        functor_Equations0_rev _ (equations_helper _ _ _))
+     | op_skip => λ P2 M, tt
+     end.
+
+Definition equations
+  : Equations@{i j} sorts sorts P P eliminators eliminators A operations M
+  := equations_helper A P M.
 End dependent_eliminator.
 
-(* Can be derived from dependent_eliminator *)
+(* Derived from dependent eliminator *)
 Section initiality.
 Universe j.
 Constraint i <= j.
 Context
   {sorts' : I → Type@{j}}
-  (operations' : Operations@{j} sorts' A)
+  (operations' : Operations@{j} sorts' sorts' A)
 .
+
+Fixpoint nondependent_methods {A : OpSpec@{i} I}
+  : Operations@{j} sorts' sorts' A →
+    Methods@{i j} sorts (init A) (λ i _, sorts' i) (λ i _, sorts' i) A (operations_helper A)
+  := match A return Operations@{j} sorts' sorts' A →
+    Methods@{i j} sorts (init A) (λ i _, sorts' i) (λ i _, sorts' i) A (operations_helper A) with
+     | el i => idmap
+     | ind_arg (single_argument i) B => λ f _ a, functor_Methods0 _
+       (nondependent_methods (A := B) (f a))
+     | ind_arg (infinitary_argument A B2) B => λ f _ a, functor_Methods0 _
+       (nondependent_methods (A := B) (f a))
+     | nonind_arg A B => λ f a, functor_Methods0 _
+       (nondependent_methods (A := B a) (f a))
+     | op_prod A B => λ x,
+       (functor_Methods0 _ (nondependent_methods (fst x)),
+        functor_Methods0 _ (nondependent_methods (snd x)))
+     | op_skip => idmap
+     end.
 
 (* Should really define morphisms including equations,
    then prove that this one is unique. *)
 
-Definition initial_morphism_sorts : ∀ i, sorts i → sorts' i.
-Admitted.
+Definition initial_morphism_sorts : ∀ i, sorts i → sorts' i
+  := eliminators (λ i _, sorts' i) (nondependent_methods operations').
 
 End initiality.
 End initial.

@@ -11,16 +11,16 @@ Record Ctx@{i} : Type@{i+1} := {
     (∀ i0, Sorts0a i0 → Sorts0b i0) →
     (∀ i0, indices1 Sorts0a i0 → indices1 Sorts0b i0);
   operations0 : OpSpec@{i} indices0;
-  operations1 : ∀ {Sorts0}, Operations@{i} Sorts0 operations0 →
+  operations1 : ∀ {Sorts0}, Operations@{i} Sorts0 Sorts0 operations0 →
                 OpSpec@{i} {i0 : indices0 & indices1 Sorts0 i0 * Sorts0 i0};
   indices2 :
     ∀ {Sorts0},
     (∀ i0, indices1 Sorts0 i0 → Sorts0 i0 → Type@{i}) →
-    Operations@{i} Sorts0 operations0 →
+    Operations@{i} Sorts0 Sorts0 operations0 →
     ∀ i0, indices1 Sorts0 i0 → Type@{i};
   Indices : Type@{i} :=
     let pre_sorts := Initial.sorts operations0 in
-    let pre_ops := Initial.operations operations0 in
+    let pre_ops := Initial.operations@{i} operations0 in
     let good_sorts i0 i1 p
      := Initial.sorts (operations1 pre_ops) (i0; (i1, p)) in
     {i0 : indices0 &
@@ -31,7 +31,7 @@ Record Ctx@{i} : Type@{i+1} := {
 Arguments functor_indices1 _ {Sorts0a Sorts0b} H {i0} _.
 
 Definition elim_Indices {Γ : Ctx} {Sorts0}
-  (Γops : Operations Sorts0 Γ.(operations0)) (i : Γ.(Indices))
+  (Γops : Operations Sorts0 Sorts0 Γ.(operations0)) (i : Γ.(Indices))
   : Γ.(indices1) Sorts0 i.1
   := Γ.(functor_indices1)
      (Initial.initial_morphism_sorts Γ.(operations0) Γops)
@@ -45,7 +45,7 @@ Record TySort@{i} (Γ : Ctx@{i}) : Type@{i+1} := {
     (∀ i0, ix1 Sorts0a i0 → ix1 Sorts0b i0);
   ix2 : ∀ {Sorts0},
     (∀ i0, Γ.(indices1) Sorts0 i0 → Sorts0 i0 → Type@{i}) →
-    Operations@{i} Sorts0 Γ.(operations0) →
+    Operations@{i} Sorts0 Sorts0 Γ.(operations0) →
     ∀ i0, ix1 Sorts0 i0 → Type@{i};
 }.
 Arguments ix0 {Γ} _.
@@ -56,8 +56,8 @@ Arguments ix2 {Γ} _ {Sorts0} Sorts1 ops0 i0 i1.
 Record TyOp@{i} (Γ : Ctx@{i}) : Type@{i+1} := {
   ops0 : OpSpec@{i} Γ.(indices0);
   ops1 : ∀ {Sorts0},
-    Operations@{i} Sorts0 Γ.(operations0) →
-    Operations@{i} Sorts0 ops0 →
+    Operations@{i} Sorts0 Sorts0 Γ.(operations0) →
+    Operations@{i} Sorts0 Sorts0 ops0 →
     OpSpec@{i} {i0 : Γ.(indices0) & Γ.(indices1) Sorts0 i0 * Sorts0 i0};
 }.
 Arguments ops0 {Γ} _.
@@ -66,7 +66,7 @@ Arguments ops1 {Γ} _ {Sorts0} _ _.
 Record Data (Γ : Ctx) := {
   data0 : DataSpec@{i} Γ.(indices0);
   data1 : ∀ {Sorts0},
-    Operations@{i} Sorts0 Γ.(operations0) →
+    Operations@{i} Sorts0 Sorts0 Γ.(operations0) →
     ElDataSpec@{i} Sorts0 data0 →
     DataSpec@{i} {i0 : Γ.(indices0) & Γ.(indices1) Sorts0 i0 * Sorts0 i0};
   data_ix1 (Sorts0 : Γ.(indices0) → Type@{i}) : Type@{i}
@@ -76,7 +76,7 @@ Record Data (Γ : Ctx) := {
     (data_ix1 Sorts0a → data_ix1 Sorts0b);
   data_ix2 : ∀ {Sorts0},
     (∀ i0, Γ.(indices1) Sorts0 i0 → Sorts0 i0 → Type@{i}) →
-    Operations@{i} Sorts0 Γ.(operations0) →
+    Operations@{i} Sorts0 Sorts0 Γ.(operations0) →
     data_ix1 Sorts0 → Type@{i}
     := λ Sorts0 Sorts1 ops0 i1,
        ElDataSpec (λ i, Sorts1 i.1 (fst i.2) (snd i.2)) (data1 ops0 i1);
@@ -89,16 +89,18 @@ Arguments data_ix2 {Γ} _ {Sorts0} Sorts1 ops0.
 
 Definition inc {Γ} (i : Indices Γ) : Data Γ
   := {|
-        data0 := inc i.1;
-        data1 Sorts0 Γops pt := inc (i.1; (elim_Indices Γops i, pt));
+        data0 := single_argument i.1;
+        data1 Sorts0 Γops pt :=
+          single_argument (i.1; (elim_Indices Γops i, pt));
         functor_data_ix1 _ _ H i1 := H _ i1;
      |}.
 
-Definition inf {Γ} (A : Type@{i}) (* `{IsHSet A} *) (B : A → Data Γ) : Data Γ
+Definition inf {Γ} (A : Type@{i}) (* `{IsHSet A} *) (B : A → Indices Γ) : Data Γ
   := {|
-        data0 := inf A (λ a, (B a).(data0));
-        data1 Sorts0 Γops0 ops0 := inf A (λ a, (B a).(data1) Γops0 (ops0 a));
-        functor_data_ix1 _ _ H i1 := λ a, (B a).(functor_data_ix1) H (i1 a);
+        data0 := infinitary_argument A (λ a, (B a).1);
+        data1 Sorts0 Γops0 ops0 :=
+          infinitary_argument A (λ a, ((B a).1; (elim_Indices Γops0 (B a), ops0 a)));
+        functor_data_ix1 _ _ H i1 := λ a, H _ (i1 a);
      |}.
 
 Definition data_to_op {Γ : Ctx} (A : Data Γ) : TyOp Γ
@@ -206,6 +208,6 @@ Definition nonind_arg {Γ} (A : Type@{i}) (* `{IsHSet A} *) (B : A → TyOp Γ)
           nonind_arg A (λ a, (B a).(ops1) ops0Γ (ops0 a));
      |}.
 
-Definition data_to_op_inf Γ A (f : A → Data Γ)
-  : data_to_op (inf A f) = nonind_arg A (data_to_op o f)
+Definition data_to_op_inf Γ A (f : A → Indices Γ)
+  : data_to_op (inf A f) = nonind_arg A (el o f)
   := 1.
