@@ -524,37 +524,36 @@ Local Notation "( @ p => IS & A H => P )"
       end)
      (p pattern, A ident, H ident).
 
-Fixpoint eliminators_helper A' i (x : init A' i) {struct x}
-  : ∀ P2,
+Local Notation P' A' i x := (∀ (P2 : ∀ i, init A' i → Type@{j}),
+         Methods@{i j} sorts (init A') P P2 A' (operations_helper A') →
+         P2 i x).
+Local Notation P2' A' B a := (∀ (P2 : ∀ i, init _ i → Type@{j}),
+             Methods@{i j} sorts _ P P2 (ind_arg A' B)
+               (operations_helper (ind_arg A' B)) →
+             Methods@{i j} sorts _ P
+             (λ i b, P2 i (init_ind_arg (ind_arg A' B) i tt a b))
+             B (operations_helper B)).
+Fixpoint eliminators_helper@{} A' i (x : init A' i) {struct x}
+  : ∀ (P2 : ∀ i, init A' i → Type@{j}),
     Methods@{i j} sorts (init A') P P2 A' (operations_helper A') →
     P2 i x
-  := let P' A' i x
-      := ∀ P2,
-         Methods@{i j} sorts (init A') P P2 A' (operations_helper A') →
-         P2 i x in
-     match x with
+  := match x return P' A' i x with
      | init_el H p as x =>
        (@ el i => λ p, match p with idpath => λ H, idmap end &
         A' H => ∀ p, P' A' i (init_el _ _ H p))
        A' H p
      | init_ind_arg H a b =>
        (@ ind_arg A B => λ a, λ b IH H M', IH _
-          (let P2 A' a := ∀ H,
-             Methods sorts _ P H (ind_arg A' B)
-               (operations_helper (ind_arg A' B)) →
-             Methods sorts _ P
-             (λ i, H i ∘ init_ind_arg (ind_arg A' B) i tt a)
-             B (operations_helper B) in
-           match a return P2 A a with
+          (match a return P2' A B a with
            | init_inc H2 x =>
              (@ single_argument i => λ x H (M' : ∀ a, _), functor_Methods0_rev _
                 (M' _ (eliminators_helper _ _ x P M)) &
-              A' H2 => ∀ x, P2 A' (init_inc _ A' H2 x))
+              A' H2 => ∀ x, P2' A' B (init_inc _ A' H2 x))
              A H2 x
            | init_inf H2 f =>
              (@ infinitary_argument A2 B2 => λ f H M', functor_Methods0_rev _
                 (M' _ (λ a2, eliminators_helper _ _ (f a2) P M)) &
-              A' H2 => ∀ f, P2 A' (init_inf _ A' H2 f))
+              A' H2 => ∀ f, P2' A' B (init_inf _ A' H2 f))
              A H2 f
            end H M') &
         A' H => ∀ a b, P' _ i b → P' A' i (init_ind_arg _ _ H a b))
@@ -573,19 +572,20 @@ Fixpoint eliminators_helper A' i (x : init A' i) {struct x}
        A' H a
      | init_op_prod_r H b =>
        (@ op_prod A B => λ b H M',
-          eliminators_helper B i b (λ i, H i o _)
+          eliminators_helper B i b _
           (functor_Methods0_rev _ (snd M')) &
         A' H => ∀ b, P' A' i (init_op_prod_r _ _ H b))
        A' H b
      end.
 
-Definition eliminators i x : P i x
+Definition eliminators@{} i x : P i x
   := eliminators_helper A i x P M.
 
-Fixpoint equations_helper A'
-  : ∀ P2 M, Equations@{i j} sorts (init A') P P2
-            eliminators (λ i x, eliminators_helper A' i x P2 M)
-            A' (operations_helper A') M
+Fixpoint equations_helper@{} A'
+  : ∀ (P2 : ∀ i, init A' i → Type@{j}) M,
+    Equations@{i j} sorts (init A') P P2
+      eliminators (λ i x, eliminators_helper A' i x P2 M)
+      A' (operations_helper A') M
   := match A' with
      | el i => λ P2 M, idpath
      | ind_arg (single_argument i) B => λ P2 M a,
@@ -600,7 +600,7 @@ Fixpoint equations_helper A'
      | op_skip => λ P2 M, tt
      end.
 
-Definition equations
+Definition equations@{}
   : Equations@{i j} sorts sorts P P eliminators eliminators A operations M
   := equations_helper A P M.
 End dependent_eliminator.
@@ -614,7 +614,7 @@ Context
   (operations' : Operations@{j} sorts' sorts' A)
 .
 
-Fixpoint nondependent_methods {A : OpSpec@{i} I}
+Fixpoint nondependent_methods@{} {A : OpSpec@{i} I}
   : Operations@{j} sorts' sorts' A →
     Methods@{i j} sorts (init A) (λ i _, sorts' i) (λ i _, sorts' i) A (operations_helper A)
   := match A return Operations@{j} sorts' sorts' A →
@@ -635,7 +635,7 @@ Fixpoint nondependent_methods {A : OpSpec@{i} I}
 (* Should really define morphisms including equations,
    then prove that this one is unique. *)
 
-Definition initial_morphism_sorts : ∀ i, sorts i → sorts' i
+Definition initial_morphism_sorts@{} : ∀ i, sorts i → sorts' i
   := eliminators (λ i _, sorts' i) (nondependent_methods operations').
 
 End initiality.
