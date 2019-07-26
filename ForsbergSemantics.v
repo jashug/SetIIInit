@@ -17,25 +17,28 @@ Record Ctx@{i} : Type@{i+1} := {
     ∀ {Sorts0},
     (∀ i0, indices1 Sorts0 i0 → Sorts0 i0 → Type@{i}) →
     Operations@{i} Sorts0 Sorts0 operations0 →
-    ∀ i0, indices1 Sorts0 i0 → Type@{i};
+    Type@{i};
+  indices_pr_20 : ∀ {Sorts0 Sorts1 ops}, @indices2 Sorts0 Sorts1 ops → indices0;
+  indices_pr_21 : ∀ {Sorts0 Sorts1 ops}, ∀ i : @indices2 Sorts0 Sorts1 ops,
+                                         indices1 Sorts0 (indices_pr_20 i);
   Indices : Type@{i} :=
     let pre_sorts := Initial.sorts operations0 in
     let pre_ops := Initial.operations@{i} operations0 in
     let good_sorts i0 i1 p
      := Initial.sorts (operations1 pre_ops) (i0; (i1, p)) in
-    {i0 : indices0 &
-    {i1 : indices1 pre_sorts i0 &
-          indices2 good_sorts pre_ops i0 i1
-    }};
+    indices2 good_sorts pre_ops;
 }.
 Arguments functor_indices1 _ {Sorts0a Sorts0b} H {i0} _.
 
 Definition elim_Indices {Γ : Ctx} {Sorts0}
   (Γops : Operations Sorts0 Sorts0 Γ.(operations0)) (i : Γ.(Indices))
-  : Γ.(indices1) Sorts0 i.1
+  : Γ.(indices1) Sorts0 (Γ.(indices_pr_20) i)
   := Γ.(functor_indices1)
      (Initial.initial_morphism_sorts Γ.(operations0) Γops)
-     i.2.1.
+     (Γ.(indices_pr_21) i).
+Definition build_ix1 {Γ Sorts0} Γops i (pt : Sorts0 (Γ.(indices_pr_20) i))
+  : {i0 : Γ.(indices0) & Γ.(indices1) Sorts0 i0 * Sorts0 i0}
+  := (_; (elim_Indices Γops i, pt)).
 
 Record TySort@{i} (Γ : Ctx@{i}) : Type@{i+1} := {
   ix0 : Type@{i};
@@ -46,12 +49,17 @@ Record TySort@{i} (Γ : Ctx@{i}) : Type@{i+1} := {
   ix2 : ∀ {Sorts0},
     (∀ i0, Γ.(indices1) Sorts0 i0 → Sorts0 i0 → Type@{i}) →
     Operations@{i} Sorts0 Sorts0 Γ.(operations0) →
-    ∀ i0, ix1 Sorts0 i0 → Type@{i};
+    Type@{i};
+  ix_pr_20 : ∀ {Sorts0 Sorts1 ops0}, @ix2 Sorts0 Sorts1 ops0 → ix0;
+  ix_pr_21 : ∀ {Sorts0 Sorts1 ops0}, ∀ i : @ix2 Sorts0 Sorts1 ops0,
+                                    ix1 Sorts0 (ix_pr_20 i);
 }.
 Arguments ix0 {Γ} _.
 Arguments ix1 {Γ} _ Sorts0 i0.
 Arguments functor_ix1 {Γ} _ {Sorts0a Sorts0b} H {i0} _.
-Arguments ix2 {Γ} _ {Sorts0} Sorts1 ops0 i0 i1.
+Arguments ix2 {Γ} _ {Sorts0} Sorts1 ops0.
+Arguments ix_pr_20 {Γ} _ {Sorts0 Sorts1 ops0} i.
+Arguments ix_pr_21 {Γ} _ {Sorts0 Sorts1 ops0} i.
 
 Record TyOp@{i} (Γ : Ctx@{i}) : Type@{i+1} := {
   ops0 : OpSpec@{i} Γ.(indices0);
@@ -89,17 +97,17 @@ Arguments data_ix2 {Γ} _ {Sorts0} Sorts1 ops0.
 
 Definition inc {Γ} (i : Indices Γ) : Data Γ
   := {|
-        data0 := single_argument i.1;
+        data0 := single_argument (Γ.(indices_pr_20) i);
         data1 Sorts0 Γops pt :=
-          single_argument (i.1; (elim_Indices Γops i, pt));
+          single_argument (build_ix1 Γops i pt);
         functor_data_ix1 _ _ H i1 := H _ i1;
      |}.
 
 Definition inf {Γ} (A : Type@{i}) (* `{IsHSet A} *) (B : A → Indices Γ) : Data Γ
   := {|
-        data0 := infinitary_argument A (λ a, (B a).1);
+        data0 := infinitary_argument A (λ a, Γ.(indices_pr_20) (B a));
         data1 Sorts0 Γops0 ops0 :=
-          infinitary_argument A (λ a, ((B a).1; (elim_Indices Γops0 (B a), ops0 a)));
+          infinitary_argument A (λ a, build_ix1 Γops0 (B a) (ops0 a));
         functor_data_ix1 _ _ H i1 := λ a, H _ (i1 a);
      |}.
 
@@ -112,12 +120,14 @@ Definition data_to_op {Γ : Ctx} (A : Data Γ) : TyOp Γ
 
 Definition emp : Ctx
   := {|
-        indices0 := Unit;
-        indices1 Sorts0 i0 := Unit;
-        functor_indices1 _ _ H i0 i1 := tt; (* maybe idmap instead? *)
+        indices0 := Empty;
+        indices1 Sorts0 i0 := match i0 with end;
+        functor_indices1 _ _ H i0 := match i0 with end;
         operations0 := op_skip;
         operations1 Sorts0 ops0 := op_skip;
-        indices2 Sorts0 Sorts1 ops0 i0 i1 := Unit;
+        indices2 Sorts0 Sorts1 ops0 := Empty;
+        indices_pr_20 Sorts0 Sorts1 ops x := x;
+        indices_pr_21 Sorts0 Sorts1 ops x := match x with end;
      |}.
 
 Definition ext_sort (Γ : Ctx) (A : TySort Γ) : Ctx
@@ -137,10 +147,15 @@ Definition ext_sort (Γ : Ctx) (A : TySort Γ) : Ctx
         operations1 Sorts0 ops0 := functor_OpSpec
           (λ i, (inl i.1; (fst i.2, snd i.2)))
           (Γ.(operations1) (Operations_compose ops0));
-        indices2 Sorts0 Sorts1 ops0 i0 :=
-          match i0 with
-          | inl iΓ => Γ.(indices2) (Sorts1 o inl) (Operations_compose ops0) iΓ
-          | inr iA => A.(ix2) (Sorts1 o inl) (Operations_compose ops0) iA
+        indices2 Sorts0 Sorts1 ops0 :=
+          Γ.(indices2) (Sorts1 o inl) (Operations_compose ops0) +
+          A.(ix2)      (Sorts1 o inl) (Operations_compose ops0);
+        indices_pr_20 Sorts0 Sorts1 ops0 :=
+          functor_sum Γ.(indices_pr_20) A.(ix_pr_20);
+        indices_pr_21 Sorts0 Sorts1 ops0 i :=
+          match i with
+          | inl iΓ => Γ.(indices_pr_21) iΓ
+          | inr iA => A.(ix_pr_21) iA
           end;
      |}.
 
@@ -154,6 +169,8 @@ Definition ext_op (Γ : Ctx) (A : TyOp Γ) : Ctx
           (Γ.(operations1) (fst ops0))
           (A.(ops1) (fst ops0) (snd ops0));
         indices2 Sorts0 Sorts1 ops0 := Γ.(indices2) Sorts1 (fst ops0);
+        indices_pr_20 Sorts0 Sorts1 ops0 := Γ.(indices_pr_20);
+        indices_pr_21 Sorts0 Sorts1 ops0 := Γ.(indices_pr_21);
      |}.
 
 Definition ext_data (Γ : Ctx) (A : Data Γ) : Ctx
@@ -164,7 +181,9 @@ Definition u {Γ} : TySort Γ
         ix0 := Unit;
         ix1 _ i0 := Unit;
         functor_ix1 _ _ H i0 i1 := tt; (* maybe idmap instead? *)
-        ix2 Sorts0 Sorts1 ops0 i0 i1 := Unit;
+        ix2 Sorts0 Sorts1 ops0 := Unit;
+        ix_pr_20 _ _ _ _ := tt;
+        ix_pr_21 _ _ _ _ := tt;
      |}.
 
 Definition ind_ix {Γ} (A : Data Γ) (B : TySort (ext_data Γ A)) : TySort Γ
@@ -174,9 +193,11 @@ Definition ind_ix {Γ} (A : Data Γ) (B : TySort (ext_data Γ A)) : TySort Γ
         functor_ix1 _ _ H i0 i1 :=
           (A.(functor_data_ix1) H (fst i1),
            B.(functor_ix1) H (snd i1));
-        ix2 Sorts0 Sorts1 ops0 i0 i1 :=
-          {g : A.(data_ix2) Sorts1 ops0 (fst i1) &
-           B.(ix2) Sorts1 (ops0, data_to_op_El (fst i1)) i0 (snd i1)};
+        ix2 Sorts0 Sorts1 ops0 :=
+          {a : {pre_a : A.(data_ix1) Sorts0 & A.(data_ix2) Sorts1 ops0 pre_a} &
+           B.(ix2) Sorts1 (ops0, data_to_op_El a.1)};
+        ix_pr_20 _ _ _ x := B.(ix_pr_20) x.2;
+        ix_pr_21 _ _ _ x := (x.1.1, B.(ix_pr_21) x.2);
      |}.
 
 Definition nonind_ix {Γ} (A : Type@{i}) (* `{IsTrunc 1 A} *) (B : A → TySort Γ)
@@ -185,7 +206,9 @@ Definition nonind_ix {Γ} (A : Type@{i}) (* `{IsTrunc 1 A} *) (B : A → TySort 
         ix0 := {a : A & (B a).(ix0)};
         ix1 Sorts0 i0 := (B i0.1).(ix1) Sorts0 i0.2;
         functor_ix1 _ _ H i0 i1 := (B i0.1).(functor_ix1) H i1;
-        ix2 Sorts0 Sorts1 ops0 i0 i1 := (B i0.1).(ix2) Sorts1 ops0 i0.2 i1;
+        ix2 Sorts0 Sorts1 ops0 := {a : A & (B a).(ix2) Sorts1 ops0};
+        ix_pr_20 _ _ _ x := (x.1; (B _).(ix_pr_20) x.2);
+        ix_pr_21 _ _ _ x := (B _).(ix_pr_21) x.2;
      |}.
 
 Definition el {Γ} (i : Indices Γ) : TyOp Γ
