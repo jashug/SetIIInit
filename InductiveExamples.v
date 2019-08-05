@@ -60,3 +60,20 @@ Check λ a f, convertible (W_rect (sup a f)) (IS a f (λ b, W_rect (f b))).
 End eliminator.
 End W.
 End Example_W.
+
+Module Example_Enum.
+Definition Enum_spec : OpSpec@{Set} Unit
+  := op_prod (op_prod (op_prod (op_prod (op_prod
+     (el tt) (el tt)) (el tt)) (el tt)) (el tt)) (el tt).
+
+Definition Enum : Type0 := Initial.sorts Enum_spec tt.
+Definition Enum_ops : ((((Enum * Enum) * Enum) * Enum) * Enum) * Enum
+  := Initial.operations Enum_spec.
+Definition e0 : Enum := Enum_ops.(fst).(fst).(fst).(fst).(fst).
+
+Definition foo@{} : Enum → trunc_index
+  := Initial.eliminators@{Set Set} Enum_spec (λ 'tt _, trunc_index)
+     (0, 1, 2, 3, 4, 5)tt.
+Check convertible (foo e0) 0.
+
+End Example_Enum.
