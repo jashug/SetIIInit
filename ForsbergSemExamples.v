@@ -16,27 +16,26 @@ Note that it includes the use of ext in pi.
 
 The construction of the specification is still quite messy, see below at
 Section test_TyCon_spec for the results.
-
-TODO: this file is very slow to check, figure out why and speed it up
 *)
 
 Arguments ind_ix {Γ} & A B.
 Arguments ind_arg {Γ} & A B.
 Arguments el {Γ} & i.
 Arguments inc {Γ} & i.
+Arguments exist A P & _ _.
 
 (* Notation for contexts *)
 Local Infix ",O" := ext_op (at level 20).
 Local Infix ",S" := ext_sort (at level 20).
 Definition ε := emp.
 
-Definition give_ix@{} {Γ}
+Definition give_ix@{i} {Γ : Ctx@{i}}
   (i : ∀ Sorts0 Sorts1
    (preops : InductiveTypes.Operations Sorts0 Sorts0 Γ.(operations0)),
    (let Sorts1' i := Sorts1 i.1 (fst i.2) (snd i.2) in
     InductiveTypes.Operations Sorts1' Sorts1' (Γ.(operations1) preops)) →
    Γ.(@indices2) Sorts0 Sorts1 preops)
-  : Indices@{Set} Γ
+  : Indices@{i} Γ
   := i _ _
      (InductiveTypes.Initial.operations _)
      (InductiveTypes.Initial.operations _).
@@ -63,7 +62,7 @@ Arguments top {Γ A Sorts0 Sorts1 ops} & i.
 Definition spec_Con_Ty_emp : Ctx@{Set}
   := ε
      ,S u (* Con *)
-     ,S ind_ix (inc (top tt)) u (* Con *)
+     ,S ind_ix (inc (top tt)) u (* Ty *)
      ,O el (popS (top tt)).
 
 Module Con_Ty_emp_Γ.
@@ -74,7 +73,7 @@ emp : Con
 Γ : Con
 *)
 Definition spec : Ctx@{Set}
-  := spec_Con_Ty_emp ,O el (popO (popS (top tt))).
+  := Eval compute in spec_Con_Ty_emp ,O el (popO (popS (top tt))).
 
 Definition presorts
   : (Empty + Unit) + Unit → Set
@@ -104,11 +103,11 @@ Definition goodΓ : goodCon preΓ := snd goodops.
 Definition Γ : {preG : preCon & goodCon preG} := (preΓ; goodΓ).
 
 Definition spec_Ty_of_Γ : Indices spec
-  := popO (popO (top (Γ; tt))).
+  := give_ix (λ _ _ preops goodops, inr ((preops.(snd); goodops.(snd)); tt)).
 Definition spec_plus_A : Ctx@{Set}
   := spec ,O el spec_Ty_of_Γ.
 Definition spec_return_Ctx : TyOp@{Set} spec_plus_A
-  := el (popO (popO (popO (popS (top tt))))).
+  := el (inl (inr tt)).
 End Con_Ty_emp_Γ.
 
 Definition spec_ext : TyOp@{Set} spec_Con_Ty_emp
@@ -116,13 +115,14 @@ Definition spec_ext : TyOp@{Set} spec_Con_Ty_emp
      (ind_arg (Γ := Con_Ty_emp_Γ.spec) (inc Con_Ty_emp_Γ.spec_Ty_of_Γ)
      Con_Ty_emp_Γ.spec_return_Ctx).
 
-Definition spec_Con_Ty_emp_ext : Ctx@{Set} := spec_Con_Ty_emp ,O spec_ext.
+Definition spec_Con_Ty_emp_ext : Ctx@{Set} := Eval compute in spec_Con_Ty_emp ,O spec_ext.
 
 Definition spec_Con_Ty_emp_ext_u : Ctx@{Set}
-  := spec_Con_Ty_emp_ext
-     ,O ind_arg (inc (popO (popO (popS (top tt)))))
+  := Eval compute in
+     spec_Con_Ty_emp_ext
+     ,O ind_arg (inc (inl (inr tt)))
         (let spec_Con_Ty_emp_ext_Γ
-          := spec_Con_Ty_emp_ext ,O el (popO (popO (popS (top tt)))) in
+          := spec_Con_Ty_emp_ext ,O el (inl (inr tt)) in
          let preops
           := InductiveTypes.Initial.operations
              spec_Con_Ty_emp_ext_Γ.(operations0) in
@@ -130,16 +130,17 @@ Definition spec_Con_Ty_emp_ext_u : Ctx@{Set}
           := InductiveTypes.Initial.operations
              (spec_Con_Ty_emp_ext_Γ.(operations1) preops) in
          let Γ := (snd preops; snd goodops) in
-         el (Γ := spec_Con_Ty_emp_ext_Γ) (popO (popO (popO (top (Γ; tt)))))).
+         el (Γ := spec_Con_Ty_emp_ext_Γ) (inr (Γ; tt))).
 
 Module spec_pi.
 Definition Ctx : Indices spec_Con_Ty_emp_ext_u
-  := popO (popO (popO (popS (top tt)))).
-Definition spec_Con_Ty_emp_ext_u_Γ := spec_Con_Ty_emp_ext_u ,O el Ctx.
+  := give_ix (λ _ _ preops goodops, inl (inr tt)).
+Definition spec_Con_Ty_emp_ext_u_Γ := Eval compute in spec_Con_Ty_emp_ext_u ,O el Ctx.
+
 Definition TyΓ : Indices spec_Con_Ty_emp_ext_u_Γ
   := give_ix (Γ := spec_Con_Ty_emp_ext_u_Γ)
-     (λ _ _ preops goodops, (inr ((snd preops; snd goodops); tt))).
-Definition spec_Con_Ty_emp_ext_u_Γ_A := spec_Con_Ty_emp_ext_u_Γ ,O el TyΓ.
+     (λ _ _ preops goodops, inr ((snd preops; snd goodops); tt)).
+Definition spec_Con_Ty_emp_ext_u_Γ_A := Eval compute in spec_Con_Ty_emp_ext_u_Γ ,O el TyΓ.
 Definition TyΓA : Indices spec_Con_Ty_emp_ext_u_Γ_A
   := give_ix (λ _ _ preops goodops,
        inr ((preops.(fst).(fst).(fst).(snd) preops.(fst).(snd) preops.(snd);
@@ -156,7 +157,7 @@ Definition spec_pi : TyOp@{Set} spec_Con_Ty_emp_ext_u
 End spec_pi.
 
 Definition TyCon_spec : Ctx@{Set}
-  := spec_Con_Ty_emp_ext_u ,O spec_pi.spec_pi.
+  := Eval compute in spec_Con_Ty_emp_ext_u ,O spec_pi.spec_pi.
 
 Local Notation convertible x y := (idpath x : x = y).
 
@@ -223,8 +224,6 @@ Definition goodCon : preCon → Set
 Definition goodTy : preCon → preTy → Set
   := λ preΓ preA, good_sorts (tag_goodTy preΓ preA).
 
-(* Below here I haven't gotten to type-check, too slow *)
-
 Definition good_ops
   : (((Unit *
     goodCon pre_emp) *
@@ -242,6 +241,6 @@ Definition Ty (Γ : Con) : Set := {preA : preTy & goodTy Γ.1 preA}.
 (*
 Indices offers a choice between
  * Con = inl (inr tt)
- * Ty Γ = inr Γ
+ * Ty Γ = inr (Γ; tt)
 *)
-Check convertible TyCon_spec.(Indices) ((Empty + Unit) + Con).
+Check convertible TyCon_spec.(Indices) ((Empty + Unit) + {_ : Con & Unit}).
